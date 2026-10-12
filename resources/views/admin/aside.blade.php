@@ -193,7 +193,7 @@
 
         {{-- VOIR LE SITE --}}
         <a
-            href="http://localhost:5173"
+            href="https://planetechsarlbenin.com"
             target="_blank"
             rel="noopener noreferrer"
             class="flex items-center gap-3 px-3 py-2.5 rounded-xl

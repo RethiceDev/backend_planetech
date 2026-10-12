@@ -14,18 +14,18 @@ class ProduitController extends Controller
      * - sa sous-catégorie
      * - la catégorie/domaine de sa sous-catégorie
      */
-    public function listes()
+   public function listes()
     {
+        $perPage = request()->input('per_page', 24); // 24 produits par page par défaut
+
         $products = Product::with([
-            'sousCategorie.category',
-        ])
+                'sousCategorie.category',
+            ])
             ->where('stock', true)
             ->orderBy('name', 'asc')
-            ->get();
+            ->paginate($perPage);
 
-        return response()->json([
-            'data' => $products,
-        ]);
+        return response()->json($products);
     }
 
     /**
