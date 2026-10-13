@@ -4,27 +4,18 @@ namespace App\Mail;
 
 use App\Models\Devis;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
-use Illuminate\Queue\SerializesModels;
 
 class DevisEnvoye extends Mailable
 {
-    use Queueable, SerializesModels;
+    // Pas de ShouldQueue : l'envoi est immédiat.
 
-    public Devis $devis;
-
-    public function __construct(Devis $devis)
+    public function __construct(public Devis $devis)
     {
-        $this->devis = $devis;
-
-        $this->devis->load([
-            'demandeDevis',
-            'lignes',
-        ]);
+        $this->devis->loadMissing(['demandeDevis', 'lignes']);
     }
 
     public function envelope(): Envelope
@@ -39,7 +30,7 @@ class DevisEnvoye extends Mailable
         return new Content(
             view: 'emails.devis-envoye',
             with: [
-                'devis' => $this->devis,
+                'devis'   => $this->devis,
                 'demande' => $this->devis->demandeDevis,
             ],
         );
@@ -47,17 +38,16 @@ class DevisEnvoye extends Mailable
 
     public function attachments(): array
     {
-        $pdf = Pdf::loadView(
-            'emails.devis-pdf',
-            [
-                'devis' => $this->devis,
-                'demande' => $this->devis->demandeDevis,
-            ]
-        );
-
         return [
             Attachment::fromData(
-                fn () => $pdf->output(),
+                function () {
+                    return Pdf::loadView('emails.devis-pdf', [
+                            'devis'   => $this->devis,
+                            'demande' => $this->devis->demandeDevis,
+                        ])
+                        ->setPaper('a4')
+                        ->output();
+                },
                 'Devis-' . $this->devis->numero . '.pdf'
             )->withMime('application/pdf'),
         ];

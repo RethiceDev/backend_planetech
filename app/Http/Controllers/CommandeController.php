@@ -6,6 +6,7 @@ use App\Mail\CommandeDisponibiliteMail;
 use App\Models\Commande;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 class CommandeController extends Controller
@@ -18,26 +19,12 @@ class CommandeController extends Controller
         $recherche = trim((string) $request->input('recherche', ''));
         $statut = $request->input('statut', 'toutes');
 
-        /*
-        |--------------------------------------------------------------------------
-        | REQUÊTE PRINCIPALE
-        |--------------------------------------------------------------------------
-        */
-
         $query = Commande::query()
             ->with('items')
             ->latest();
 
-        /*
-        |--------------------------------------------------------------------------
-        | RECHERCHE
-        |--------------------------------------------------------------------------
-        */
-
         if ($recherche !== '') {
-
             $query->where(function ($q) use ($recherche) {
-
                 $q->where('reference', 'like', "%{$recherche}%")
                     ->orWhere('nom', 'like', "%{$recherche}%")
                     ->orWhere('raison_sociale', 'like', "%{$recherche}%")
@@ -46,136 +33,62 @@ class CommandeController extends Controller
             });
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | FILTRE PAR STATUT
-        |--------------------------------------------------------------------------
-        */
-
         switch ($statut) {
-
             case 'nouvelles':
-
                 $query->where('statut', 'recue');
-
                 break;
 
             case 'en_cours':
-
-                $query->whereIn('statut', [
-                    'en_cours',
-                    'en_traitement',
-                ]);
-
+                $query->whereIn('statut', ['en_cours', 'en_traitement']);
                 break;
 
             case 'terminees':
-
-                $query->whereIn('statut', [
-                    'terminee',
-                    'livree',
-                ]);
-
+                $query->whereIn('statut', ['terminee', 'livree']);
                 break;
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | PAGINATION
-        |--------------------------------------------------------------------------
-        |
-        | 10 commandes par page.
-        | withQueryString() conserve :
-        | - recherche
-        | - statut
-        | lorsque l'utilisateur change de page.
-        |
-        */
 
         $commandes = $query
             ->paginate(10)
             ->withQueryString();
 
-        /*
-        |--------------------------------------------------------------------------
-        | STATISTIQUES GLOBALES
-        |--------------------------------------------------------------------------
-        */
-
         $totalCommandes = Commande::count();
-
-        $nouvellesCommandes = Commande::where(
-            'statut',
-            'recue'
-        )->count();
-
-        $commandesEnCours = Commande::whereIn(
-            'statut',
-            [
-                'en_cours',
-                'en_traitement',
-            ]
-        )->count();
-
-        $commandesTerminees = Commande::whereIn(
-            'statut',
-            [
-                'terminee',
-                'livree',
-            ]
-        )->count();
+        $nouvellesCommandes = Commande::where('statut', 'recue')->count();
+        $commandesEnCours = Commande::whereIn('statut', ['en_cours', 'en_traitement'])->count();
+        $commandesTerminees = Commande::whereIn('statut', ['terminee', 'livree'])->count();
 
         /*
-        |--------------------------------------------------------------------------
-        | DONNÉES POUR LE MODAL
-        |--------------------------------------------------------------------------
-        |
-        | Important :
-        | commandesData contient uniquement les commandes
-        | de la page actuellement affichée.
-        |
+        | Données du modal : uniquement les commandes de la page affichée.
+        | Les prix et la disponibilité restent null tant que l'admin
+        | n'a pas envoyé le devis.
         */
-
         $commandesData = [];
 
         foreach ($commandes as $commande) {
-
             $commandesData[$commande->id] = [
-
                 'id' => $commande->id,
-
                 'reference' => $commande->reference,
-
                 'type_client' => $commande->type_client,
-
                 'nom' => $commande->nom,
-
                 'raison_sociale' => $commande->raison_sociale,
-
                 'email' => $commande->email,
-
                 'telephone' => $commande->telephone,
-
-                'total' => (float) $commande->total,
-
+                'total' => $commande->total !== null ? (float) $commande->total : null,
                 'statut' => $commande->statut,
-
                 'items' => $commande->items
                     ->map(function ($item) {
-
                         return [
-
                             'id' => $item->id,
-
                             'designation' => $item->designation,
-
                             'quantite' => (int) $item->quantite,
-
-                            'prix_unitaire' => (float) $item->prix_unitaire,
-
-                            'total_ligne' => (float) $item->total_ligne,
-
-                            'disponible' => (bool) $item->disponible,
+                            'prix_unitaire' => $item->prix_unitaire !== null
+                                ? (float) $item->prix_unitaire
+                                : null,
+                            'total_ligne' => $item->total_ligne !== null
+                                ? (float) $item->total_ligne
+                                : null,
+                            'disponible' => $item->disponible === null
+                                ? null
+                                : (bool) $item->disponible,
                         ];
                     })
                     ->values()
@@ -183,288 +96,135 @@ class CommandeController extends Controller
             ];
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | VUE
-        |--------------------------------------------------------------------------
-        */
-
         return view('admin.commande', [
-
             'commandes' => $commandes,
-
             'totalCommandes' => $totalCommandes,
-
             'nouvellesCommandes' => $nouvellesCommandes,
-
             'commandesEnCours' => $commandesEnCours,
-
             'commandesTerminees' => $commandesTerminees,
-
             'recherche' => $recherche,
-
             'statut' => $statut,
-
             'commandesData' => $commandesData,
         ]);
     }
 
-
     /**
-     * Confirmer que tous les produits de la commande
-     * sont disponibles.
+     * Enregistre la disponibilité et les prix de chaque article,
+     * calcule le total, puis envoie le devis au client par email.
      */
-    public function confirmerDisponibilite(
-        Request $request,
-        Commande $commande
-    ) {
-        try {
-
-            $commande->load('items');
-
-            /*
-            |--------------------------------------------------------------------------
-            | Vérifier les articles
-            |--------------------------------------------------------------------------
-            */
-
-            if ($commande->items->isEmpty()) {
-
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Cette commande ne contient aucun article.',
-                ], 422);
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | Mise à jour
-            |--------------------------------------------------------------------------
-            */
-
-            DB::transaction(function () use ($commande) {
-
-                foreach ($commande->items as $item) {
-
-                    $item->update([
-                        'disponible' => true,
-                    ]);
-                }
-
-                $commande->update([
-                    'statut' => 'en_traitement',
-                ]);
-            });
-
-            /*
-            |--------------------------------------------------------------------------
-            | Recharger
-            |--------------------------------------------------------------------------
-            */
-
-            $commande->refresh();
-            $commande->load('items');
-
-            /*
-            |--------------------------------------------------------------------------
-            | Envoyer le mail
-            |--------------------------------------------------------------------------
-            */
-
-            if (!empty($commande->email)) {
-
-                Mail::to($commande->email)->send(
-                    new CommandeDisponibiliteMail($commande)
-                );
-            }
-
-            return response()->json([
-
-                'success' => true,
-
-                'message' =>
-                    'La disponibilité a été confirmée et le client a été informé.',
-
-            ]);
-
-        } catch (\Throwable $e) {
-
-            report($e);
-
-            return response()->json([
-
-                'success' => false,
-
-                'message' =>
-                    'Une erreur est survenue lors de la confirmation de la disponibilité.',
-
-            ], 500);
-        }
-    }
-
-
-    /**
-     * Enregistrer la disponibilité de chaque article
-     * et informer automatiquement le client.
-     */
-    public function signalerIndisponibilite(
-        Request $request,
-        Commande $commande
-    ) {
-        /*
-        |--------------------------------------------------------------------------
-        | VALIDATION
-        |--------------------------------------------------------------------------
-        */
-
+    public function envoyerDevis(Request $request, Commande $commande)
+    {
         $validated = $request->validate([
-
-            'items' => [
-                'required',
-                'array',
-                'min:1',
-            ],
-
-            'items.*.id' => [
-                'required',
-                'integer',
-                'distinct',
-                'exists:commande_items,id',
-            ],
-
-            'items.*.disponible' => [
-                'required',
-                'boolean',
-            ],
-
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.id' => ['required', 'integer', 'distinct'],
+            'items.*.disponible' => ['required', 'boolean'],
+            'items.*.prix_unitaire' => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        try {
+        $commande->load('items');
 
-            $commande->load('items');
+        if ($commande->items->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cette commande ne contient aucun article.',
+            ], 422);
+        }
 
-            /*
-            |--------------------------------------------------------------------------
-            | Vérifier les articles
-            |--------------------------------------------------------------------------
-            */
+        // Toutes les lignes de la commande doivent être traitées,
+        // et uniquement celles de cette commande.
+        $idsCommande = $commande->items->pluck('id')->map(fn ($id) => (int) $id)->sort()->values();
+        $idsRecus = collect($validated['items'])->pluck('id')->map(fn ($id) => (int) $id)->sort()->values();
 
-            if ($commande->items->isEmpty()) {
+        if ($idsCommande->all() !== $idsRecus->all()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Les articles envoyés ne correspondent pas à cette commande.',
+            ], 422);
+        }
 
+        // Un article disponible doit avoir un prix.
+        foreach ($validated['items'] as $itemData) {
+            $disponible = filter_var($itemData['disponible'], FILTER_VALIDATE_BOOLEAN);
+            $prix = $itemData['prix_unitaire'] ?? null;
+
+            if ($disponible && ($prix === null || $prix === '' || (float) $prix <= 0)) {
                 return response()->json([
-
                     'success' => false,
-
-                    'message' =>
-                        'Cette commande ne contient aucun article.',
-
+                    'message' => 'Renseignez un prix pour chaque article disponible.',
                 ], 422);
             }
+        }
 
-            /*
-            |--------------------------------------------------------------------------
-            | Vérifier que les articles appartiennent
-            | bien à la commande
-            |--------------------------------------------------------------------------
-            */
-
-            $itemsCommande = $commande->items
-                ->pluck('id')
-                ->map(fn ($id) => (int) $id);
-
-            foreach ($validated['items'] as $itemData) {
-
-                if (!$itemsCommande->contains((int) $itemData['id'])) {
-
-                    return response()->json([
-
-                        'success' => false,
-
-                        'message' =>
-                            'Un article envoyé ne correspond pas à cette commande.',
-
-                    ], 422);
-                }
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | Mise à jour des disponibilités
-            |--------------------------------------------------------------------------
-            */
-
+        try {
             DB::transaction(function () use ($commande, $validated) {
+                $total = 0;
 
                 foreach ($validated['items'] as $itemData) {
-
-                    $item = $commande->items->firstWhere(
-                        'id',
-                        (int) $itemData['id']
-                    );
+                    $item = $commande->items->firstWhere('id', (int) $itemData['id']);
 
                     if (!$item) {
                         continue;
                     }
 
-                    $item->update([
-                        'disponible' => (bool) $itemData['disponible'],
-                    ]);
+                    $disponible = filter_var($itemData['disponible'], FILTER_VALIDATE_BOOLEAN);
+
+                    if ($disponible) {
+                        $prix = (float) $itemData['prix_unitaire'];
+                        $totalLigne = $prix * (int) $item->quantite;
+                        $total += $totalLigne;
+
+                        $item->update([
+                            'disponible' => true,
+                            'prix_unitaire' => $prix,
+                            'total_ligne' => $totalLigne,
+                        ]);
+                    } else {
+                        $item->update([
+                            'disponible' => false,
+                            'prix_unitaire' => null,
+                            'total_ligne' => null,
+                        ]);
+                    }
                 }
 
                 $commande->update([
+                    'total' => $total,
                     'statut' => 'en_traitement',
                 ]);
             });
-
-            /*
-            |--------------------------------------------------------------------------
-            | Recharger
-            |--------------------------------------------------------------------------
-            */
-
-            $commande->refresh();
-            $commande->load('items');
-
-            /*
-            |--------------------------------------------------------------------------
-            | Envoyer le mail
-            |--------------------------------------------------------------------------
-            */
-
-            if (!empty($commande->email)) {
-
-                Mail::to($commande->email)->send(
-                    new CommandeDisponibiliteMail($commande)
-                );
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | Réponse
-            |--------------------------------------------------------------------------
-            */
-
-            return response()->json([
-
-                'success' => true,
-
-                'message' =>
-                    'Les disponibilités ont été enregistrées et le client a été informé.',
-
-            ]);
-
         } catch (\Throwable $e) {
-
             report($e);
 
             return response()->json([
-
                 'success' => false,
-
-                'message' =>
-                    'Une erreur est survenue lors de l\'envoi au client.',
-
+                'message' => 'Une erreur est survenue lors de l\'enregistrement du devis.',
             ], 500);
         }
+
+        $commande->refresh();
+        $commande->load('items');
+
+        if (empty($commande->email)) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Devis enregistré, mais ce client n\'a pas d\'adresse email.',
+            ]);
+        }
+
+        try {
+            Mail::to($commande->email)->send(new CommandeDisponibiliteMail($commande));
+        } catch (\Throwable $e) {
+            Log::error('Erreur envoi devis client : ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Devis enregistré, mais l\'email n\'a pas pu être envoyé au client. Réessayez.',
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Le devis a été enregistré et envoyé au client.',
+        ]);
     }
 }

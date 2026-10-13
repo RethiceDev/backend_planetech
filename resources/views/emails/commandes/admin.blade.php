@@ -21,20 +21,9 @@
             overflow: hidden;
         }
 
-        .header {
-            background: #176b4d;
-            color: #ffffff;
-            padding: 22px 25px;
-        }
-
-        .header h1 {
-            margin: 0;
-            font-size: 21px;
-        }
-
-        .body {
-            padding: 25px;
-        }
+        .header { background: #176b4d; color: #ffffff; padding: 22px 25px; }
+        .header h1 { margin: 0; font-size: 21px; }
+        .body { padding: 25px; }
 
         .reference {
             background: #eef7f2;
@@ -43,22 +32,16 @@
             margin: 18px 0;
         }
 
-        .info {
-            margin: 7px 0;
-        }
+        .info { margin: 7px 0; }
+        .label { font-weight: bold; }
 
-        .label {
-            font-weight: bold;
-        }
-
-        .total {
+        .action {
             margin-top: 20px;
             padding: 15px;
-            background: #176b4d;
-            color: #ffffff;
+            background: #eef7f2;
             border-radius: 8px;
-            font-size: 18px;
-            font-weight: bold;
+            font-size: 14px;
+            color: #176b4d;
         }
 
         .footer {
@@ -81,22 +64,18 @@
     <div class="body">
 
         <p>
-            Une nouvelle commande vient d'être enregistrée
-            depuis la boutique PLANETECH.
+            Une nouvelle commande vient d'être enregistrée depuis la boutique PLANETECH.
         </p>
 
         <div class="reference">
-            <strong>Référence :</strong>
-            {{ $commande->reference }}
+            <strong>Référence :</strong> {{ $commande->reference }}
         </div>
 
         <h3>Client</h3>
 
         <div class="info">
             <span class="label">Type :</span>
-            {{ $commande->type_client === 'entreprise'
-                ? 'Entreprise'
-                : 'Particulier' }}
+            {{ $commande->type_client === 'entreprise' ? 'Entreprise' : 'Particulier' }}
         </div>
 
         @if($commande->type_client === 'entreprise')
@@ -121,19 +100,19 @@
             {{ $commande->telephone }}
         </div>
 
-        <div class="total">
-            Total :
-            {{ number_format(
-                $commande->total,
-                0,
-                ',',
-                ' '
-            ) }}
-            FCFA
+        <div class="info">
+            <span class="label">Articles :</span>
+            {{ $commande->items->count() }} article(s) •
+            {{ $commande->items->sum('quantite') }} unité(s)
+        </div>
+
+        <div class="action">
+            Connectez-vous à l'administration pour vérifier la disponibilité,
+            renseigner les prix et envoyer le devis au client.
         </div>
 
         <p style="margin-top: 22px;">
-            Le PDF détaillé de la commande est joint à cet email.
+            Le bon de commande détaillé est joint à cet email.
         </p>
 
     </div>

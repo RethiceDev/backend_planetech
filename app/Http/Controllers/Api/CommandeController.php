@@ -13,7 +13,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 
 class CommandeController extends Controller
 {
@@ -39,40 +38,29 @@ class CommandeController extends Controller
                 'reference' => $reference,
                 'type_client' => $validated['type_client'],
                 'nom' => $validated['nom'],
-                'raison_sociale' => $validated['type_client'] === 'entreprise' ? $validated['raison_sociale'] : null,
+                'raison_sociale' => $validated['type_client'] === 'entreprise'
+                    ? $validated['raison_sociale']
+                    : null,
                 'email' => $validated['email'],
                 'telephone' => $validated['telephone'],
-                'total' => 0,
+                // Le total sera calculé par l'admin lors de l'envoi du devis.
+                'total' => null,
                 'statut' => 'recue',
             ]);
 
-            $totalCommande = 0;
-
             foreach ($validated['items'] as $item) {
-                $produit = Product::query()->whereKey($item['product_id'])->lockForUpdate()->first();
-
-                if (!$produit || !$produit->stock || $produit->price === null) {
-                    throw ValidationException::withMessages([
-                        'items' => ['Un des produits sélectionnés n’est plus disponible ou est sur devis.'],
-                    ]);
-                }
-
-                $quantite = (int) $item['quantite'];
-                $prixUnitaire = (float) $produit->price;
-                $totalLigne = $prixUnitaire * $quantite;
+                $produit = Product::findOrFail($item['product_id']);
 
                 $commande->items()->create([
                     'product_id' => $produit->id,
                     'designation' => $produit->name,
-                    'quantite' => $quantite,
-                    'prix_unitaire' => $prixUnitaire,
-                    'total_ligne' => $totalLigne,
+                    'quantite' => (int) $item['quantite'],
+                    // Prix et disponibilité renseignés plus tard par l'admin.
+                    'prix_unitaire' => null,
+                    'total_ligne' => null,
+                    'disponible' => null,
                 ]);
-
-                $totalCommande += $totalLigne;
             }
-
-            $commande->update(['total' => $totalCommande]);
 
             return $commande;
         });
@@ -81,12 +69,15 @@ class CommandeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | GÉNÉRATION DU PDF
+        | GÉNÉRATION DU PDF (bon de commande, sans prix)
         |--------------------------------------------------------------------------
         */
         $pdfData = null;
+
         try {
-            $pdf = Pdf::loadView('pdf.commande', ['commande' => $commande])->setPaper('a4', 'portrait');
+            $pdf = Pdf::loadView('pdf.commande', ['commande' => $commande])
+                ->setPaper('a4', 'portrait');
+
             $pdfData = $pdf->output();
         } catch (\Throwable $e) {
             Log::error('Erreur génération PDF commande: ' . $e->getMessage());
@@ -94,14 +85,13 @@ class CommandeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | ENVOI EMAIL PLANETECH (ADMIN) - TEST ENVOI DIRECT (send)
+        | EMAIL PLANETECH (ADMIN)
         |--------------------------------------------------------------------------
         */
         if ($pdfData !== null) {
             try {
                 $emailPlanetech = config('mail.admin_address') ?? config('mail.from.address');
 
-                // Utilisation de ->send() au lieu de ->queue() pour tester instantanément
                 Mail::to($emailPlanetech)->send(new CommandeAdminMail($commande, $pdfData));
 
                 Log::info('Email PLANETECH envoyé avec succès à ' . $emailPlanetech);
@@ -112,11 +102,12 @@ class CommandeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | ENVOI EMAIL CLIENT - TEST ENVOI DIRECT (send)
+        | EMAIL CLIENT (confirmation de réception, sans prix)
         |--------------------------------------------------------------------------
         */
         try {
             Mail::to($commande->email)->send(new CommandeConfirmationMail($commande));
+
             Log::info('Email client envoyé avec succès à ' . $commande->email);
         } catch (\Throwable $e) {
             Log::error('Erreur envoi email client : ' . $e->getMessage());
@@ -124,7 +115,7 @@ class CommandeController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Votre commande a été enregistrée avec succès.',
+            'message' => 'Votre demande a bien été enregistrée. Nous vous contacterons avec la disponibilité et les prix.',
             'reference' => $commande->reference,
             'commande' => $commande,
         ], 201);

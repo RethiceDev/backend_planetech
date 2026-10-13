@@ -157,9 +157,6 @@ Route::middleware([
     Route::get('/commande', [CommandeController::class, 'index'])
         ->name('admin.commandes');
 
-    Route::post('/commande/{commande}/disponibilite', [CommandeController::class, 'confirmerDisponibilite'])
-        ->name('admin.commandes.disponibilite');
-
-    Route::post('/commande/{commande}/indisponibilite', [CommandeController::class, 'signalerIndisponibilite'])
-        ->name('admin.commandes.indisponibilite');
+    Route::post('/commande/{commande}/devis', [CommandeController::class, 'envoyerDevis'])
+    ->name('commande.devis');
 });

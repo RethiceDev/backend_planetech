@@ -21,33 +21,15 @@
             overflow: hidden;
         }
 
-        .header {
-            background: #176b4d;
-            color: #ffffff;
-            padding: 25px;
-        }
-
-        .header h1 {
-            margin: 0;
-            font-size: 21px;
-        }
-
-        .body {
-            padding: 25px;
-        }
+        .header { background: #176b4d; color: #ffffff; padding: 25px; }
+        .header h1 { margin: 0; font-size: 21px; }
+        .body { padding: 25px; }
 
         .reference {
             margin: 18px 0;
             padding: 14px;
             background: #eef7f2;
             border-left: 4px solid #176b4d;
-        }
-
-        .total {
-            margin-top: 20px;
-            font-size: 18px;
-            font-weight: bold;
-            color: #176b4d;
         }
 
         .footer {
@@ -70,40 +52,27 @@
     <div class="body">
 
         <p>
-            Bonjour
-            <strong>{{ $commande->nom }}</strong>,
+            Bonjour <strong>{{ $commande->nom }}</strong>,
         </p>
 
         <p>
-            Nous vous confirmons la bonne réception de votre
-            commande auprès de PLANETECH SARL.
+            Nous vous confirmons la bonne réception de votre commande
+            auprès de PLANETECH SARL.
         </p>
 
         <div class="reference">
-
             <strong>Référence de votre commande :</strong>
 
             <div style="margin-top: 5px; font-size: 18px;">
                 {{ $commande->reference }}
             </div>
-
         </div>
 
         <p>
-            Votre commande a bien été enregistrée par notre équipe.
-            Nous vous contacterons prochainement pour la suite.
+            Notre équipe va vérifier la disponibilité des articles demandés.
+            Nous vous communiquerons ensuite les prix et la disponibilité
+            par email.
         </p>
-
-        <div class="total">
-            Montant de la commande :
-            {{ number_format(
-                $commande->total,
-                0,
-                ',',
-                ' '
-            ) }}
-            FCFA
-        </div>
 
         <p style="margin-top: 25px;">
             Merci pour votre confiance.
@@ -112,14 +81,11 @@
         <p>
             <strong>PLANETECH SARL</strong><br>
 
-            Tél :
-            +229 64 54 99 59 /
-            68 60 18 05
+            Tél : +229 64 54 99 59 / 68 60 18 05
 
             <br>
 
-            Email :
-            {{ config('mail.from.address') }}
+            Email : {{ config('mail.from.address') }}
         </p>
 
     </div>

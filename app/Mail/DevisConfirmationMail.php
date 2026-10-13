@@ -3,42 +3,36 @@
 namespace App\Mail;
 
 use App\Models\DemandeDevis;
-use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
-use Illuminate\Queue\SerializesModels;
+use Symfony\Component\Mime\Email;
 
 class DevisConfirmationMail extends Mailable
 {
-    use Queueable, SerializesModels;
+    // Pas de ShouldQueue : l'envoi est immédiat.
 
-    public DemandeDevis $demande;
-
-    public function __construct(DemandeDevis $demande)
+    public function __construct(public DemandeDevis $demande)
     {
-        $this->demande = $demande;
     }
 
     public function build()
     {
-        return $this
-            ->subject(
-                'Confirmation de votre demande de devis - ' .
-                $this->demande->reference
-            )
+        $logoPath = public_path('images/logo.png');
+        $logoDisponible = is_file($logoPath);
+
+        $mail = $this
+            ->subject('Confirmation de votre demande de devis - ' . $this->demande->reference)
             ->view('emails.devis-confirmation')
             ->with([
-                'demande' => $this->demande,
-            ])
-            ->withSymfonyMessage(function ($message) {
+                'demande'        => $this->demande,
+                'logoDisponible' => $logoDisponible,
+            ]);
 
-                $logoPath = public_path('images/logo.png');
-
-                if (file_exists($logoPath)) {
-                    $message->embedFromPath(
-                        $logoPath,
-                        'planetech-logo'
-                    );
-                }
+        if ($logoDisponible) {
+            $mail->withSymfonyMessage(function (Email $message) use ($logoPath) {
+                $message->embedFromPath($logoPath, 'planetech-logo', 'image/png');
             });
+        }
+
+        return $mail;
     }
 }

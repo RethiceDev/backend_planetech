@@ -123,7 +123,7 @@
              >
                 <i data-lucide="shopping-cart" class="w-5 h-5"></i>
 
-                <span>Commandes</span>
+                <span>Bons de Commandes</span>
             </a>
 
 
