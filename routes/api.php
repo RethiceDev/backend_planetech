@@ -12,9 +12,13 @@ use App\Http\Controllers\Api\RealisationController as ApiRealisationController;
 
 Route::post('/devis', [DevisController::class, 'store']);
 
+// Produits : liste paginée/filtrée + détail
 Route::get('/produits', [ProduitController::class, 'listes']);
+Route::get('/produits/{product}', [ProduitController::class, 'show']);
 
-Route::get('/categorie', [CategoryController::class, 'listes']);
+// Catégories + sous-catégories (chargement global)
+Route::get('/categories', [CategoryController::class, 'listes']);
+Route::get('/categorie', [CategoryController::class, 'listes']); // alias
 
 Route::get('/domaines', [DomainesController::class, 'listes']);
 
@@ -23,7 +27,5 @@ Route::get('/partenaires', [PartenaireController::class, 'listes']);
 Route::get('/equipe', [EquipeController::class, 'listes']);
 
 Route::post('/commandes', [CommandeController::class, 'store']);
-Route::get(
-    '/realisations',
-    [ApiRealisationController::class, 'index']
-);
+
+Route::get('/realisations', [ApiRealisationController::class, 'index']);

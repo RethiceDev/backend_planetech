@@ -14,26 +14,18 @@ use App\Models\Product;
 class ScrapeFibresOptiques extends Command
 {
     protected $signature = 'etechnologies:fibres-optiques';
-    protected $description = 'Scrape tous les produits de la catégorie Fibres Optiques sur E-technologies avec pagination complète';
+    protected $description = 'Scrape et range intelligemment les fibres optiques avec photos et prix à NULL';
 
     public function handle()
     {
-        $this->info('Début du scraping de la catégorie Fibres Optiques (E-technologies)...');
+        $this->info('Début du scraping intelligent de la catégorie Fibres Optiques (E-technologies)...');
 
         $baseUrl = 'https://etechnologies.shop/product-category/cablage/fibres-optiques/';
         
-        // Créer ou récupérer la catégorie parente et la sous-catégorie
-        $category = Category::firstOrCreate(['nom' => 'Câblage']);
-        $sousCat = SousCategorie::firstOrCreate([
-            'category_id' => $category->id,
-            'nom' => 'Fibres Optiques'
-        ]);
-
         $page = 1;
         $hasNextPage = true;
 
-        while ($hasNextPage && $page <= 30) { // Sécurité fixée à 30 pages max
-            // Gestion de l'URL paginée (WooCommerce standard : /page/X/)
+        while ($hasNextPage && $page <= 30) {
             $url = $page === 1 ? $baseUrl : rtrim($baseUrl, '/') . '/page/' . $page . '/';
             
             $this->info("--------------------------------------------------");
@@ -57,7 +49,7 @@ class ScrapeFibresOptiques extends Command
 
                 $this->info("   -> " . $productNodes->count() . " produits détectés sur cette page.");
 
-                $productNodes->each(function (Crawler $node) use ($sousCat) {
+                $productNodes->each(function (Crawler $node) {
                     try {
                         // Nom du produit
                         $titleNode = $node->filter('.woocommerce-loop-product__title, h2, h3, .product-title');
@@ -72,40 +64,69 @@ class ScrapeFibresOptiques extends Command
                         $imgNode = $node->filter('img');
                         $imgUrl = $imgNode->count() > 0 ? ($imgNode->attr('data-src') ?: $imgNode->attr('src')) : null;
 
-                        $description = "Produit importé depuis E-technologies (Fibres Optiques)";
-                        $photoPath = null;
+                        // ----------------------------------------------------
+                        // RÈGLE STRICTE : AUCUN PRODUIT SANS PHOTO
+                        // ----------------------------------------------------
+                        if (!$imgUrl) {
+                            $this->line("    [IGNORÉ - Pas d'URL image] {$productName}");
+                            return;
+                        }
 
-                        // Récupération de la description détaillée sur la page produit
+                        $description = "Produit importé depuis E-technologies (Fibres Optiques)";
+                        $scrapedSubCatName = "Fibres Optiques";
+
+                        // Récupération de la description détaillée et du fil d'Ariane
                         if ($productUrl) {
                             try {
                                 $prodResponse = Http::timeout(15)->get($productUrl);
                                 if ($prodResponse->successful()) {
                                     $prodCrawler = new Crawler($prodResponse->body());
+                                    
                                     $descNode = $prodCrawler->filter('.woocommerce-product-details__short-description, .description, .entry-content');
                                     if ($descNode->count() > 0) {
                                         $description = trim($descNode->text());
                                     }
+
+                                    $breadcrumbNode = $prodCrawler->filter('.woocommerce-breadcrumb, nav.woocommerce-breadcrumb');
+                                    if ($breadcrumbNode->count() > 0) {
+                                        $crumbs = $breadcrumbNode->filter('a');
+                                        if ($crumbs->count() >= 2) {
+                                            $scrapedSubCatName = trim($crumbs->last()->text());
+                                        }
+                                    }
                                 }
-                            } catch (\Exception $ex) {
-                                // Ignore l'erreur de sous-page pour ne pas bloquer
-                            }
+                            } catch (\Exception $ex) {}
                         }
 
                         // Téléchargement de l'image
-                        if ($imgUrl) {
-                            try {
-                                $imageContents = @file_get_contents($imgUrl);
-                                if ($imageContents) {
-                                    $imageName = 'products/' . Str::slug($productName) . '-' . time() . '.jpg';
-                                    Storage::disk('public')->put($imageName, $imageContents);
-                                    $photoPath = $imageName;
-                                }
-                            } catch (\Exception $ex) {
-                                // Ignore l'erreur d'image
+                        $photoPath = null;
+                        try {
+                            $imageContents = @file_get_contents($imgUrl);
+                            if ($imageContents) {
+                                $imageName = 'products/' . Str::slug($productName) . '-' . time() . '.jpg';
+                                Storage::disk('public')->put($imageName, $imageContents);
+                                $photoPath = $imageName;
                             }
-                        }
+                        } catch (\Exception $ex) {}
 
-                        // Enregistrement en base de données (Prix forcé à NULL)
+                        // Si le téléchargement échoue, on ignore le produit
+                        if (!$photoPath) {
+                            $this->line("    [IGNORÉ - Échec téléchargement image] {$productName}");
+                            return;
+                        }
+                        // ----------------------------------------------------
+
+                        // IA / Logique de classification vers l'une des 6 grandes catégories (ou Divers)
+                        $mainCategoryName = $this->mapToMainCategory($productName . ' ' . $scrapedSubCatName);
+                        
+                        $category = Category::firstOrCreate(['nom' => $mainCategoryName]);
+
+                        $sousCat = SousCategorie::firstOrCreate([
+                            'category_id' => $category->id,
+                            'nom' => $scrapedSubCatName
+                        ]);
+
+                        // Enregistrement en base de données (Prix strictement forcé à NULL)
                         Product::firstOrCreate(
                             [
                                 'name' => $productName,
@@ -114,23 +135,20 @@ class ScrapeFibresOptiques extends Command
                             [
                                 'description' => $description,
                                 'photo' => $photoPath,
-                                'price' => null, // Aucun faux prix extrait
+                                'price' => null, // Forcé à NULL
                                 'stock' => true
                             ]
                         );
 
-                        $this->line("      [AJOUTÉ] {$productName}");
+                        $this->line("    [SUCCÈS] {$productName} -> [{$category->nom} > {$sousCat->nom}]");
 
-                    } catch (\Exception $e) {
-                        // Ignore un produit isolé en erreur
-                    }
+                    } catch (\Exception $e) {}
                 });
 
-                // Vérifier s'il y a une page suivante (bouton .next.page-numbers ou lien suivant)
                 $nextPageNode = $crawler->filter('a.next.page-numbers, .pagination .next');
                 if ($nextPageNode->count() > 0) {
                     $page++;
-                    sleep(2); // Pause de 2 secondes pour ne pas surcharger le serveur
+                    sleep(2);
                 } else {
                     $hasNextPage = false;
                 }
@@ -141,6 +159,40 @@ class ScrapeFibresOptiques extends Command
             }
         }
 
-        $this->info('Scraping de la catégorie Fibres Optiques terminé avec succès !');
+        $this->info('Scraping et classement intelligent de la catégorie Fibres Optiques terminés avec succès !');
+    }
+
+    /**
+     * Système intelligent pour ranger un produit dans l'une des 6 grandes catégories ou dans Divers.
+     */
+    private function mapToMainCategory(string $text): string
+    {
+        $name = mb_strtolower($text);
+
+        if (str_contains($name, 'climat') || str_contains($name, 'froid') || str_contains($name, 'ventilateur') || str_contains($name, 'split') || str_contains($name, 'refroidisseur')) {
+            return 'Froid et Climatisation';
+        }
+
+        if (str_contains($name, 'camera') || str_contains($name, 'securite') || str_contains($name, 'surveillance') || str_contains($name, 'alarme') || str_contains($name, 'interphone') || str_contains($name, 'dvr') || str_contains($name, 'nvr')) {
+            return 'Caméra de surveillance & Sécurité';
+        }
+
+        if (str_contains($name, 'reseau') || str_contains($name, 'telecom') || str_contains($name, 'routeur') || str_contains($name, 'switch') || str_contains($name, 'wifi') || str_contains($name, 'fibre') || str_contains($name, 'cable')) {
+            return 'Télécoms & Réseau';
+        }
+
+        if (str_contains($name, 'ordinateur') || str_contains($name, 'informatique') || str_contains($name, 'pc') || str_contains($name, 'laptop') || str_contains($name, 'ecran') || str_contains($name, 'clavier') || str_contains($name, 'imprimante') || str_contains($name, 'disque')) {
+            return 'Informatique';
+        }
+
+        if (str_contains($name, 'btp') || str_contains($name, 'construction') || str_contains($name, 'outillage') || str_contains($name, 'ciment')) {
+            return 'BTP';
+        }
+
+        if (str_contains($name, 'electrique') || str_contains($name, 'electricite') || str_contains($name, 'lampe') || str_contains($name, 'disjoncteur')) {
+            return 'Électricité';
+        }
+
+        return 'Divers';
     }
 }

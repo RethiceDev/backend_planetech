@@ -14,21 +14,18 @@ use App\Models\Product;
 class ScrapeOrdinateursPc extends Command
 {
     protected $signature = 'protechtogo:scrape-ordinateurs';
-    protected $description = 'Scrape tous les produits de la catégorie Ordinateurs & PC sur protechtogo.com';
+    protected $description = 'Scrape et range intelligemment les ordinateurs avec photos et prix à NULL';
 
     public function handle()
     {
-        $this->info('Début du scraping de la catégorie Ordinateurs & PC...');
+        $this->info('Début du scraping intelligent de la catégorie Ordinateurs & PC...');
 
         $baseUrl = 'https://protechtogo.com/product-category/ordinateurs-pc/';
         
-        // Création de la catégorie principale
-        $category = Category::firstOrCreate(['nom' => 'Informatique &ordinateurs']);
-
         $page = 1;
         $hasNextPage = true;
 
-        while ($hasNextPage && $page <= 25) { // Sécurité augmentée pour couvrir les pages multiples
+        while ($hasNextPage && $page <= 25) {
             $url = $page === 1 ? $baseUrl : $baseUrl . 'page/' . $page . '/';
 
             $this->info("--------------------------------------------------");
@@ -52,7 +49,7 @@ class ScrapeOrdinateursPc extends Command
 
                 $this->info("-> {$productNodes->count()} produits trouvés. Traitement en cours...");
 
-                $productNodes->each(function (Crawler $node) use ($category) {
+                $productNodes->each(function (Crawler $node) {
                     try {
                         // Nom du produit
                         $titleNode = $node->filter('.woocommerce-loop-product__title, h2, h3, .product-title');
@@ -63,21 +60,20 @@ class ScrapeOrdinateursPc extends Command
                         $linkNode = $node->filter('a.woocommerce-LoopProduct-link, a');
                         $productUrl = $linkNode->count() > 0 ? $linkNode->attr('href') : null;
 
-                        // Prix
-                        $priceNode = $node->filter('.price, .amount');
-                        $price = null;
-                        if ($priceNode->count() > 0) {
-                            $priceText = preg_replace('/[^0-9.,]/', '', $priceNode->text());
-                            $price = $priceText ? floatval(str_replace(',', '.', $priceText)) : null;
-                        }
-
                         // Image
                         $imgNode = $node->filter('img');
                         $imgUrl = $imgNode->count() > 0 ? ($imgNode->attr('data-src') ?: $imgNode->attr('src')) : null;
 
+                        // ----------------------------------------------------
+                        // RÈGLE STRICTE : AUCUN PRODUIT SANS PHOTO
+                        // ----------------------------------------------------
+                        if (!$imgUrl) {
+                            $this->line("    [IGNORÉ - Pas d'URL image] {$productName}");
+                            return;
+                        }
+
                         $description = "Produit importé depuis Protech Togo";
-                        $photoPath = null;
-                        $sousCatName = "Ordinateurs Portables & PC";
+                        $scrapedSubCatName = "Ordinateurs Portables & PC";
 
                         // Récupération des détails sur la fiche du produit
                         if ($productUrl) {
@@ -97,32 +93,42 @@ class ScrapeOrdinateursPc extends Command
                                     if ($breadcrumbNode->count() > 0) {
                                         $crumbs = $breadcrumbNode->filter('a');
                                         if ($crumbs->count() >= 2) {
-                                            $sousCatName = trim($crumbs->last()->text());
+                                            $scrapedSubCatName = trim($crumbs->last()->text());
                                         }
                                     }
                                 }
                             } catch (\Exception $e) {}
                         }
 
-                        // Gestion de la sous-catégorie
+                        // Téléchargement de l'image
+                        $photoPath = null;
+                        try {
+                            $imageContents = @file_get_contents($imgUrl);
+                            if ($imageContents) {
+                                $imageName = 'products/' . Str::slug($productName) . '-' . time() . '.jpg';
+                                Storage::disk('public')->put($imageName, $imageContents);
+                                $photoPath = $imageName;
+                            }
+                        } catch (\Exception $e) {}
+
+                        // Si le téléchargement échoue, on ignore le produit
+                        if (!$photoPath) {
+                            $this->line("    [IGNORÉ - Échec téléchargement image] {$productName}");
+                            return;
+                        }
+                        // ----------------------------------------------------
+
+                        // IA / Logique de classification vers l'une des 6 grandes catégories
+                        $mainCategoryName = $this->mapToMainCategory($productName . ' ' . $scrapedSubCatName);
+                        
+                        $category = Category::firstOrCreate(['nom' => $mainCategoryName]);
+
                         $sousCat = SousCategorie::firstOrCreate([
                             'category_id' => $category->id,
-                            'nom' => $sousCatName
+                            'nom' => $scrapedSubCatName
                         ]);
 
-                        // Téléchargement de l'image
-                        if ($imgUrl) {
-                            try {
-                                $imageContents = @file_get_contents($imgUrl);
-                                if ($imageContents) {
-                                    $imageName = 'products/' . Str::slug($productName) . '-' . time() . '.jpg';
-                                    Storage::disk('public')->put($imageName, $imageContents);
-                                    $photoPath = $imageName;
-                                }
-                            } catch (\Exception $e) {}
-                        }
-
-                        // Enregistrement en base de données
+                        // Enregistrement en base de données (Prix strictement forcé à NULL)
                         Product::firstOrCreate(
                             [
                                 'name' => $productName,
@@ -131,17 +137,16 @@ class ScrapeOrdinateursPc extends Command
                             [
                                 'description' => $description,
                                 'photo' => $photoPath,
-                                'price' => $price,
+                                'price' => null, // Forcé à NULL
                                 'stock' => true
                             ]
                         );
 
-                        $this->info("   -> [AJOUTÉ] {$productName} | Prix: " . ($price ?? 'N/C'));
+                        $this->line("    [SUCCÈS] {$productName} -> [{$category->nom} > {$sousCat->nom}]");
 
                     } catch (\Exception $e) {}
                 });
 
-                // Incrémentation de la page
                 $page++;
                 usleep(500000); // Pause de 0.5s
 
@@ -151,6 +156,36 @@ class ScrapeOrdinateursPc extends Command
             }
         }
 
-        $this->info('Scraping de la catégorie Ordinateurs & PC terminé avec succès !');
+        $this->info('Scraping et classement intelligent de la catégorie Ordinateurs & PC terminés avec succès !');
+    }
+
+    /**
+     * Système intelligent pour ranger un produit dans l'une des 6 grandes catégories.
+     */
+    private function mapToMainCategory(string $text): string
+    {
+        $name = mb_strtolower($text);
+
+        if (str_contains($name, 'climat') || str_contains($name, 'froid') || str_contains($name, 'ventilateur') || str_contains($name, 'split') || str_contains($name, 'refroidisseur')) {
+            return 'Froid et Climatisation';
+        }
+
+        if (str_contains($name, 'camera') || str_contains($name, 'securite') || str_contains($name, 'surveillance') || str_contains($name, 'alarme') || str_contains($name, 'interphone') || str_contains($name, 'dvr') || str_contains($name, 'nvr')) {
+            return 'Caméra de surveillance & Sécurité';
+        }
+
+        if (str_contains($name, 'reseau') || str_contains($name, 'telecom') || str_contains($name, 'routeur') || str_contains($name, 'switch') || str_contains($name, 'wifi') || str_contains($name, 'fibre') || str_contains($name, 'cable')) {
+            return 'Télécoms & Réseau';
+        }
+
+        if (str_contains($name, 'ordinateur') || str_contains($name, 'informatique') || str_contains($name, 'pc') || str_contains($name, 'laptop') || str_contains($name, 'ecran') || str_contains($name, 'clavier') || str_contains($name, 'imprimante') || str_contains($name, 'disque')) {
+            return 'Informatique';
+        }
+
+        if (str_contains($name, 'btp') || str_contains($name, 'construction') || str_contains($name, 'outillage') || str_contains($name, 'ciment')) {
+            return 'BTP';
+        }
+
+        return 'Électricité';
     }
 }
