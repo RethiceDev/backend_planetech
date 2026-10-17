@@ -8,6 +8,14 @@
             $logo = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($fichier));
         }
     }
+
+    // Signature + cachet : chargés automatiquement si le contrôleur ne les fournit pas
+    if (empty($cachet)) {
+        $cheminCachet = storage_path('app/private/cachet-signature.png');
+        if (is_file($cheminCachet)) {
+            $cachet = 'data:image/png;base64,' . base64_encode(file_get_contents($cheminCachet));
+        }
+    }
 @endphp
 
 <!DOCTYPE html>
@@ -19,7 +27,6 @@
         @page { margin: 30px 40px 80px 40px; }
         body { font-family: DejaVu Sans, sans-serif; color: #111; font-size: 14px; line-height: 1.8; margin: 0; }
 
-        /* ===== EN-TÊTE AVEC LOGO ===== */
         table.entete { width: 100%; border-collapse: collapse; border-bottom: 2px solid #1b4d3e; margin-bottom: 20px; }
         table.entete td { vertical-align: middle; padding: 0 0 12px 0; }
         td.logo-cell { width: 110px; padding-right: 15px; }
@@ -33,8 +40,15 @@
         .actions-list { margin: 15px 0 25px 20px; }
         .actions-list li { margin-bottom: 6px; }
         .footer-date { text-align: right; margin-top: 40px; font-style: italic; }
-        .signature-box { margin-top: 50px; text-align: right; }
-        .signature-box .title-sig { font-weight: bold; text-decoration: underline; margin-bottom: 40px; }
+
+        table.signature { width: 100%; border-collapse: collapse; margin-top: 30px; page-break-inside: avoid; }
+        table.signature td.vide { width: 55%; }
+        table.signature td.sig { width: 45%; text-align: center; vertical-align: top; }
+        .sig-titre { font-weight: bold; text-decoration: underline; }
+        .sig-image { height: 115px; margin: 4px 0; }
+        .sig-image img { max-height: 115px; max-width: 100%; }
+        .sig-nom { font-weight: bold; }
+
         .legal-footer { position: fixed; bottom: -50px; left: 0; right: 0; text-align: center; font-size: 9px; color: #666; border-top: 1px solid #ddd; padding-top: 8px; }
     </style>
 </head>
@@ -83,10 +97,20 @@
         Fait à Cotonou, le {{ $procuration->created_at->format('d/m/Y') }}
     </div>
 
-    <div class="signature-box">
-        <div class="title-sig">LE DIRECTEUR GENERAL</div>
-        <p><strong>{{ $procuration->nom_donnateur }}</strong></p>
-    </div>
+    <table class="signature">
+        <tr>
+            <td class="vide"></td>
+            <td class="sig">
+                <div class="sig-titre"></div>
+                <div class="sig-image">
+                    @if(!empty($cachet))
+                        <img src="{{ $cachet }}" alt="Signature et cachet">
+                    @endif
+                </div>
+                <div class="sig-nom"></div>
+            </td>
+        </tr>
+    </table>
 
     <div class="legal-footer">
         04 BP : 0624 Cotonou . Compte Bancaire : 010002670139 Ora Bank . RCCM : RB/COT/13-B-9794 - IFU N° : 3201300290010<br>

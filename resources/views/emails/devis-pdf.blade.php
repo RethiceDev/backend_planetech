@@ -1048,7 +1048,6 @@
             <td class="signature-right">
 
                 <div class="signature-title">
-                    Pour PLANETECH SARL
                 </div>
 
                 @if($cachetBase64)
@@ -1069,11 +1068,10 @@
                 @endif
 
                 <div class="signature-name">
-                    Armelle ASSOGBA
+
                 </div>
 
                 <div class="signature-role">
-                    PDG
                 </div>
 
             </td>

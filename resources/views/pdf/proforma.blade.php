@@ -161,13 +161,13 @@
         Fait à Cotonou, le {{ now()->format('d/m/Y') }}
     </div>
 
-    @php $signataire = 'Armelle ASSOGBA'; @endphp
+    @php $signataire = ''; @endphp
 
     <table class="signature">
         <tr>
             <td class="vide"></td>
             <td class="sig">
-                <div class="sig-titre">Le Directeur Général</div>
+                <div class="sig-titre"></div>
                 <div class="sig-image">
                     @if(!empty($cachet))
                         <img src="{{ $cachet }}" alt="Signature et cachet">
