@@ -2,7 +2,35 @@
     $admin = Auth::guard('admin')->user();
 @endphp
 
-<aside class="w-64 bg-forest-900 text-white flex flex-col justify-between hidden md:flex shadow-xl">
+{{-- Bouton menu visible sur téléphone --}}
+<button
+    id="admin-sidebar-toggle"
+    type="button"
+    aria-label="Ouvrir le menu de navigation"
+    aria-controls="admin-sidebar"
+    aria-expanded="false"
+    class="fixed left-4 top-4 z-[60] inline-flex h-11 w-11 items-center justify-center
+           rounded-xl bg-forest-900 text-white shadow-lg transition hover:bg-forest-800
+           focus:outline-none focus:ring-2 focus:ring-emerald-400 md:hidden"
+>
+    <i data-lucide="menu" class="h-5 w-5"></i>
+</button>
+
+{{-- Fond sombre derrière le menu sur téléphone --}}
+<div
+    id="admin-sidebar-backdrop"
+    class="fixed inset-0 z-40 hidden bg-black/50 md:hidden"
+    aria-hidden="true"
+></div>
+
+<aside
+    id="admin-sidebar"
+    class="fixed inset-y-0 left-0 z-50 flex w-64 max-w-[85vw] flex-col justify-between
+           overflow-y-auto bg-forest-900 text-white shadow-xl
+           -translate-x-full transition-transform duration-300 ease-in-out
+           md:static md:z-auto md:min-h-screen md:max-w-none md:translate-x-0
+           md:shrink-0 md:overflow-visible md:transition-none"
+>
 
     {{-- ========================================================= --}}
     {{-- PARTIE HAUTE --}}
@@ -140,6 +168,24 @@
             </a>
 
 
+        <a
+            href="{{ route('admin.decharges.index') }}"
+            class="nav-link flex items-center gap-3 px-4 py-3 rounded-2xl font-medium text-sm transition-all duration-200 {{ request()->routeIs('admin.decharges.*') ? 'bg-forest-700 text-white shadow-sm' : 'text-emerald-100/70 hover:bg-forest-700/50 hover:text-white' }}"
+            >
+            <i data-lucide="file-check-2" class="w-5 h-5"></i>
+            <span>Décharges</span>
+        </a>
+
+            <a
+                href="/admin/procurations"
+                class="nav-link flex items-center gap-3 px-4 py-3 rounded-2xl
+                    text-emerald-100/70 hover:bg-forest-700/50
+                    hover:text-white font-medium text-sm transition-all duration-200"
+             >
+                <i data-lucide="file-signature" class="w-5 h-5"></i>
+                <span>Procurations</span>
+            </a>
+
 
 
             {{-- ===================================================== --}}
@@ -238,6 +284,53 @@
 <script>
 document.addEventListener("DOMContentLoaded", () => {
 
+    const sidebar = document.getElementById("admin-sidebar");
+    const menuButton = document.getElementById("admin-sidebar-toggle");
+    const backdrop = document.getElementById("admin-sidebar-backdrop");
+
+    const ouvrirMenu = () => {
+        sidebar?.classList.remove("-translate-x-full");
+        sidebar?.classList.add("translate-x-0");
+        backdrop?.classList.remove("hidden");
+        menuButton?.setAttribute("aria-expanded", "true");
+        menuButton?.setAttribute("aria-label", "Fermer le menu de navigation");
+        if (window.lucide) window.lucide.createIcons();
+    };
+
+    const fermerMenu = () => {
+        sidebar?.classList.add("-translate-x-full");
+        sidebar?.classList.remove("translate-x-0");
+        backdrop?.classList.add("hidden");
+        menuButton?.setAttribute("aria-expanded", "false");
+        menuButton?.setAttribute("aria-label", "Ouvrir le menu de navigation");
+    };
+
+    menuButton?.addEventListener("click", () => {
+        const ouvert = menuButton.getAttribute("aria-expanded") === "true";
+        ouvert ? fermerMenu() : ouvrirMenu();
+    });
+
+    backdrop?.addEventListener("click", fermerMenu);
+
+    // Fermer le panneau après le choix d'une rubrique sur téléphone.
+    sidebar?.querySelectorAll("#admin-sidebar-nav .nav-link").forEach(link => {
+        link.addEventListener("click", () => {
+            if (window.innerWidth < 768) fermerMenu();
+        });
+    });
+
+    // Si la fenêtre repasse en mode ordinateur, rétablir l'affichage normal.
+    window.addEventListener("resize", () => {
+        if (window.innerWidth >= 768) {
+            sidebar?.classList.remove("-translate-x-full");
+            sidebar?.classList.remove("translate-x-0");
+            backdrop?.classList.add("hidden");
+            menuButton?.setAttribute("aria-expanded", "false");
+        } else if (menuButton?.getAttribute("aria-expanded") !== "true") {
+            sidebar?.classList.add("-translate-x-full");
+        }
+    });
+
     const currentPath = window.location.pathname;
 
     const navLinks = document.querySelectorAll(
@@ -319,5 +412,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     });
 
+    if (window.lucide) window.lucide.createIcons();
 });
 </script>

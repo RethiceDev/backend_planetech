@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Mail\CommandeDisponibiliteMail;
 use App\Models\Commande;
+use App\Support\NombreEnLettres;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -110,7 +112,8 @@ class CommandeController extends Controller
 
     /**
      * Enregistre la disponibilité et les prix de chaque article,
-     * calcule le total, puis envoie le devis au client par email.
+     * calcule le total, puis envoie le devis au client par email
+     * avec la proforma en PDF.
      */
     public function envoyerDevis(Request $request, Commande $commande)
     {
@@ -211,8 +214,40 @@ class CommandeController extends Controller
             ]);
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | GÉNÉRATION DU PDF DE PROFORMA
+        |--------------------------------------------------------------------------
+        | Si la génération échoue, le devis part quand même par email (sans PDF)
+        | et l'admin en est informé dans le message de retour.
+        */
+        $pdfData = null;
+
         try {
-            Mail::to($commande->email)->send(new CommandeDisponibiliteMail($commande));
+            // Les prix saisis par l'admin sont considérés comme des prix HT.
+            $tauxTva = 18;
+            $montantHt = (int) round((float) $commande->total);
+            $montantTva = (int) round($montantHt * $tauxTva / 100);
+            $montantTtc = $montantHt + $montantTva;
+
+            $pdfData = Pdf::loadView('pdf.proforma', [
+                'commande' => $commande,
+                'logo' => $this->logoBase64(),
+                'cachet' => $this->cachetBase64(),
+                'tauxTva' => $tauxTva,
+                'montantHt' => $montantHt,
+                'montantTva' => $montantTva,
+                'montantTtc' => $montantTtc,
+                'montantEnLettres' => mb_strtoupper(NombreEnLettres::convertir($montantTtc), 'UTF-8'),
+            ])
+                ->setPaper('a4', 'portrait')
+                ->output();
+        } catch (\Throwable $e) {
+            Log::error('Erreur génération PDF proforma : ' . $e->getMessage());
+        }
+
+        try {
+            Mail::to($commande->email)->send(new CommandeDisponibiliteMail($commande, $pdfData));
         } catch (\Throwable $e) {
             Log::error('Erreur envoi devis client : ' . $e->getMessage());
 
@@ -224,7 +259,46 @@ class CommandeController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Le devis a été enregistré et envoyé au client.',
+            'message' => $pdfData !== null
+                ? 'Le devis a été enregistré et envoyé au client avec la proforma en PDF.'
+                : 'Le devis a été envoyé au client, mais le PDF de la proforma n\'a pas pu être généré (voir les logs).',
         ]);
+    }
+
+    /**
+     * Logo en base64 pour Dompdf (le plus fiable pour les images).
+     * Place le logo dans public/images/logo.png, ou adapte le chemin ci-dessous.
+     */
+    private function logoBase64(): ?string
+    {
+        $chemins = [
+            public_path('images/logo.png'),
+            public_path('logo.png'),
+        ];
+
+        foreach ($chemins as $chemin) {
+            if (is_file($chemin)) {
+                return 'data:' . mime_content_type($chemin) . ';base64,' . base64_encode(file_get_contents($chemin));
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Signature + cachet de l'entreprise (image PNG à fond transparent).
+     * Fichier : storage/app/private/cachet-signature.png
+     * Il est volontairement hors du dossier public/ pour qu'il ne soit
+     * pas téléchargeable depuis le navigateur.
+     */
+    private function cachetBase64(): ?string
+    {
+        $chemin = storage_path('app/private/cachet-signature.png');
+
+        if (!is_file($chemin)) {
+            return null;
+        }
+
+        return 'data:image/png;base64,' . base64_encode(file_get_contents($chemin));
     }
 }

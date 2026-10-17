@@ -21,8 +21,15 @@ class CommandeDisponibiliteMail extends Mailable
 
     public $articlesIndisponibles;
 
-    public function __construct(Commande $commande)
+    /**
+     * Contenu binaire du PDF de la proforma (null = pas de pièce jointe).
+     */
+    public ?string $pdfData;
+
+    public function __construct(Commande $commande, ?string $pdfData = null)
     {
+        $this->pdfData = $pdfData;
+
         /*
         |--------------------------------------------------------------------------
         | Recharger la commande et ses articles depuis la base
@@ -123,9 +130,25 @@ class CommandeDisponibiliteMail extends Mailable
                 . $this->commande->reference;
         }
 
-
-        return $this
+        $mail = $this
             ->subject($sujet)
             ->view('emails.commande-disponibilite');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Proforma en PDF (si elle a pu être générée)
+        |--------------------------------------------------------------------------
+        */
+
+        if ($this->pdfData !== null) {
+            $mail->attachData(
+                $this->pdfData,
+                'Proforma-' . $this->commande->reference . '.pdf',
+                ['mime' => 'application/pdf']
+            );
+        }
+
+        return $mail;
     }
 }

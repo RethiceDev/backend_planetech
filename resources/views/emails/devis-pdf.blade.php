@@ -425,7 +425,17 @@
         .signature-title {
             font-size: 7px;
             color: #6b7280;
-            margin-bottom: 16px;
+            margin-bottom: 4px;
+        }
+
+        .signature-image {
+            height: 85px;
+            margin-bottom: 2px;
+        }
+
+        .signature-image img {
+            max-height: 85px;
+            max-width: 100%;
         }
 
         .signature-name {
@@ -443,7 +453,7 @@
         .signature-line {
             border-top: 1px solid #9ca3af;
             width: 130px;
-            margin: 0 auto 4px auto;
+            margin: 18px auto 4px auto;
         }
 
         /* =========================================================
@@ -490,6 +500,18 @@
             file_get_contents($logoPath)
         );
     }
+
+    /* =========================================================
+       SIGNATURE + CACHET
+       Fichier : storage/app/private/cachet-signature.png
+       (PNG à fond transparent, hors du dossier public)
+    ========================================================== */
+
+    $cachetPath = storage_path('app/private/cachet-signature.png');
+
+    $cachetBase64 = file_exists($cachetPath)
+        ? base64_encode(file_get_contents($cachetPath))
+        : null;
 
     /* =========================================================
        CALCUL TVA
@@ -1029,7 +1051,22 @@
                     Pour PLANETECH SARL
                 </div>
 
-                <div class="signature-line"></div>
+                @if($cachetBase64)
+
+                    <div class="signature-image">
+
+                        <img
+                            src="data:image/png;base64,{{ $cachetBase64 }}"
+                            alt="Signature et cachet"
+                        >
+
+                    </div>
+
+                @else
+
+                    <div class="signature-line"></div>
+
+                @endif
 
                 <div class="signature-name">
                     Armelle ASSOGBA

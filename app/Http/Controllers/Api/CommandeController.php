@@ -24,9 +24,21 @@ class CommandeController extends Controller
             'raison_sociale' => ['required_if:type_client,entreprise', 'nullable', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
             'telephone' => ['required', 'string', 'max:50'],
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
-            'items.*.quantite' => ['required', 'integer', 'min:1'],
+
+            'items' => ['required', 'array', 'min:1', 'max:100'],
+
+            // Ligne du catalogue (panier de la boutique) : product_id fourni.
+            'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
+
+            // Ligne libre (commande par liste) : désignation obligatoire
+            // quand il n'y a pas de product_id.
+            'items.*.designation' => ['required_without:items.*.product_id', 'nullable', 'string', 'max:255'],
+
+            'items.*.quantite' => ['required', 'integer', 'min:1', 'max:100000'],
+        ], [
+            'items.*.designation.required_without' => 'Chaque article doit avoir une désignation.',
+            'items.*.quantite.required' => 'Chaque article doit avoir une quantité.',
+            'items.*.quantite.min' => 'Chaque quantité doit être au moins égale à 1.',
         ]);
 
         $commande = DB::transaction(function () use ($validated) {
@@ -49,11 +61,20 @@ class CommandeController extends Controller
             ]);
 
             foreach ($validated['items'] as $item) {
-                $produit = Product::findOrFail($item['product_id']);
+                if (!empty($item['product_id'])) {
+                    // Article du catalogue
+                    $produit = Product::findOrFail($item['product_id']);
+                    $productId = $produit->id;
+                    $designation = $produit->name;
+                } else {
+                    // Article libre saisi par le client
+                    $productId = null;
+                    $designation = trim($item['designation']);
+                }
 
                 $commande->items()->create([
-                    'product_id' => $produit->id,
-                    'designation' => $produit->name,
+                    'product_id' => $productId,
+                    'designation' => $designation,
                     'quantite' => (int) $item['quantite'],
                     // Prix et disponibilité renseignés plus tard par l'admin.
                     'prix_unitaire' => null,

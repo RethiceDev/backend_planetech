@@ -14,6 +14,30 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\RealisationController;
 use App\Http\Controllers\SousCategorieController;
 
+
+use App\Http\Controllers\Admin\DechargeController;
+
+use App\Http\Controllers\Admin\ProcurationController;
+
+Route::prefix('admin')->group(function () {
+    Route::get('/procurations', [ProcurationController::class, 'index'])->name('admin.procurations.index');
+    Route::post('/procurations', [ProcurationController::class, 'store'])->name('admin.procurations.store');
+    Route::get('/procurations/{id}/pdf', [ProcurationController::class, 'viewPdf'])->name('admin.procurations.pdf.view');
+    Route::get('/procurations/{id}/download', [ProcurationController::class, 'downloadPdf'])->name('admin.procurations.pdf.download');
+});
+
+Route::prefix('admin')->group(function () {
+    Route::get('/decharges', [DechargeController::class, 'index'])->name('admin.decharges.index');
+    Route::post('/decharges', [DechargeController::class, 'store'])->name('admin.decharges.store');
+    Route::get('/decharges/{decharge}/pdf', [DechargeController::class, 'pdf'])->name('admin.decharges.pdf');
+});
+
+
+    Route::get('/procuration',function(){
+    return view('admin.procuration');
+    });
+
+
 /*
 |--------------------------------------------------------------------------
 | AUTHENTIFICATION ADMINISTRATEUR
@@ -31,6 +55,7 @@ Route::post('/Administateur/login', [AdminAuthController::class, 'login'])
 // Déconnexion
 Route::post('/Administateur/logout', [AdminAuthController::class, 'logout'])
     ->name('admin.logout');
+
 
 
 /*
