@@ -265,6 +265,70 @@
 
             </div>
 
+            {{-- =====================================================
+     STATISTIQUES DE VISITES
+====================================================== --}}
+@isset($statsVisites)
+@php
+    $sv = $statsVisites;
+    $pct = $sv['evolution'];
+    $hausse = $pct !== null && $pct >= 0;
+@endphp
+
+<div class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm border-l-4 border-l-forest-700">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-xl bg-forest-50 text-forest-700 flex items-center justify-center">
+                <i data-lucide="eye" class="h-5 w-5"></i>
+            </div>
+            <div>
+                <p class="text-xs font-medium text-slate-muted">Visiteurs du site</p>
+                <p class="text-xl font-bold text-slate-900">
+                    {{ $sv['moisLabel'] }} : {{ number_format($sv['moisTotal'], 0, ',', ' ') }}
+                    visite{{ $sv['moisTotal'] > 1 ? 's' : '' }}
+                    @if($pct !== null)
+                        <span class="text-sm font-semibold {{ $hausse ? 'text-emerald-600' : 'text-red-600' }}">
+                            ({{ $hausse ? '+' : '' }}{{ $pct }}% vs {{ strtolower($sv['precedentLabel']) }})
+                        </span>
+                    @else
+                        <span class="text-sm font-medium text-slate-muted">
+                            (pas de données en {{ strtolower($sv['precedentLabel']) }})
+                        </span>
+                    @endif
+                </p>
+            </div>
+        </div>
+
+        @if(count($sv['sources']) > 0)
+            <div class="flex flex-wrap gap-2">
+                @foreach($sv['sources'] as $s)
+                    <span class="rounded-full bg-forest-50 px-3 py-1 text-xs font-semibold text-forest-700">
+                        {{ $s['source'] }} : {{ $s['total'] }}
+                    </span>
+                @endforeach
+            </div>
+        @endif
+    </div>
+</div>
+
+<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+    <div class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+        <h3 class="text-base font-bold text-slate-900">Évolution {{ $sv['year'] }}</h3>
+        <p class="mt-1 text-xs text-slate-muted">Total des visites par mois (mois terminés)</p>
+        <div class="mt-6 relative h-64 w-full">
+            <canvas id="visitsYearChart"></canvas>
+        </div>
+    </div>
+
+    <div class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+        <h3 class="text-base font-bold text-slate-900">{{ $sv['moisLabel'] }} : jour par jour</h3>
+        <p class="mt-1 text-xs text-slate-muted">Visites enregistrées depuis le 1er du mois</p>
+        <div class="mt-6 relative h-64 w-full">
+            <canvas id="visitsMonthChart"></canvas>
+        </div>
+    </div>
+</div>
+@endisset
 
             {{-- =====================================================
                  SECTION GRAPHIQUES (ÉVOLUTION & RÉPARTITION)
@@ -823,6 +887,77 @@
 @endphp
 
 <script>
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | STATISTIQUES DE VISITES
+    |--------------------------------------------------------------------------
+    */
+    const visites = @json($statsVisites ?? null);
+
+    if (visites && typeof Chart !== 'undefined') {
+        const optionsVisites = {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#0f2c23',
+                    padding: 12,
+                    cornerRadius: 10,
+                    callbacks: {
+                        label: function (c) { return ' ' + c.parsed.y + ' visite(s)'; }
+                    }
+                }
+            },
+            scales: {
+                x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 11 } }, border: { display: false } },
+                y: { beginAtZero: true, ticks: { precision: 0, color: '#64748b', padding: 8, font: { size: 11 } }, grid: { color: '#f1f5f9' }, border: { display: false } }
+            }
+        };
+
+        const canvasAnnee = document.getElementById('visitsYearChart');
+        if (canvasAnnee) {
+            new Chart(canvasAnnee, {
+                type: 'line',
+                data: {
+                    labels: visites.monthLabels,
+                    datasets: [{
+                        data: visites.monthTotals,
+                        borderColor: '#1b4d3e',
+                        backgroundColor: 'rgba(27, 77, 62, 0.10)',
+                        borderWidth: 3, tension: 0.35, fill: true,
+                        pointBackgroundColor: '#1b4d3e', pointBorderColor: '#fff',
+                        pointBorderWidth: 2, pointRadius: 4, pointHoverRadius: 6
+                    }]
+                },
+                options: optionsVisites
+            });
+        }
+
+        const canvasMois = document.getElementById('visitsMonthChart');
+        if (canvasMois) {
+            new Chart(canvasMois, {
+                type: 'line',
+                data: {
+                    labels: visites.dayLabels,
+                    datasets: [{
+                        data: visites.dayTotals,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                        borderWidth: 2, tension: 0.35, fill: true,
+                        pointBackgroundColor: '#10b981', pointBorderColor: '#fff',
+                        pointBorderWidth: 2, pointRadius: 3, pointHoverRadius: 5
+                    }]
+                },
+                options: optionsVisites
+            });
+        }
+    }
+
+    
 document.addEventListener('DOMContentLoaded', function () {
     if (window.lucide) {
         window.lucide.createIcons();

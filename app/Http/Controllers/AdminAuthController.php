@@ -13,7 +13,7 @@ use App\Models\Domaine;
 use App\Models\Equipe;
 use App\Models\Category;
 use App\Models\Commande;
-
+use App\Models\Visit;
 
 class AdminAuthController extends Controller
 {
@@ -289,6 +289,7 @@ public function dashboard()
         'devis' => $jours->pluck('devis')->values(),
     ];
 
+
     /*
     |--------------------------------------------------------------------------
     | GRAPHIQUE 2 : RÉPARTITION DES COMMANDES PAR STATUT
@@ -328,6 +329,8 @@ public function dashboard()
             ->map(fn ($total) => (int) $total)
             ->values(),
     ];
+
+    $statsVisites = Visit::yearEvolution();
 
     /*
     |--------------------------------------------------------------------------
@@ -369,7 +372,8 @@ public function dashboard()
 
             // Graphiques dynamiques
             'graphiqueEvolution',
-            'graphiqueStatuts'
+            'graphiqueStatuts',
+            'statsVisites'
         )
     );
 }

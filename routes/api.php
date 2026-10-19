@@ -9,7 +9,9 @@ use App\Http\Controllers\Api\ProduitController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\CommandeController;
 use App\Http\Controllers\Api\RealisationController as ApiRealisationController;
+use App\Http\Controllers\VisitController;
 
+Route::post('/track', [VisitController::class, 'track'])->middleware('throttle:120,1');
 Route::post('/devis', [DevisController::class, 'store']);
 
 // Produits : liste paginée/filtrée + détail
