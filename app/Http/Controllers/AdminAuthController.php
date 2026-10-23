@@ -5,9 +5,10 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 use App\Models\DemandeDevis;
-use App\Models\Devis;
 use App\Models\Product;
 use App\Models\Domaine;
 use App\Models\Equipe;
@@ -74,6 +75,12 @@ class AdminAuthController extends Controller
 
             $request->session()->regenerate();
 
+            // Mémoriser l'empreinte du mot de passe pour cette session
+            $request->session()->put(
+                'admin_pw_hash',
+                hash('sha256', (string) Auth::guard('admin')->user()->mot_de_passe)
+            );
+
 
             return redirect()
                 ->route('admin.accueil')
@@ -100,283 +107,271 @@ class AdminAuthController extends Controller
      * TABLEAU DE BORD
      * ==============================
      */
+    public function dashboard()
+    {
+        $admin = Auth::guard('admin')->user();
 
-    /**
-     * Afficher le tableau de bord.
-     */
+        /*
+        |--------------------------------------------------------------------------
+        | DATE DU JOUR
+        |--------------------------------------------------------------------------
+        */
 
-/**
- * ==============================
- * TABLEAU DE BORD
- * ==============================
- */
-public function dashboard()
-{
-    $admin = Auth::guard('admin')->user();
+        $aujourdhui = now()->toDateString();
 
-    /*
-    |--------------------------------------------------------------------------
-    | DATE DU JOUR
-    |--------------------------------------------------------------------------
-    */
+        /*
+        |--------------------------------------------------------------------------
+        | DEMANDES DE DEVIS
+        |--------------------------------------------------------------------------
+        */
 
-    $aujourdhui = now()->toDateString();
+        $totalDevis = DemandeDevis::count();
 
-    /*
-    |--------------------------------------------------------------------------
-    | DEMANDES DE DEVIS
-    |--------------------------------------------------------------------------
-    */
+        $devisEnAttente = DemandeDevis::where(
+            'statut',
+            'en_attente'
+        )->count();
 
-    $totalDevis = DemandeDevis::count();
+        $countAujourdhui = DemandeDevis::whereDate(
+            'created_at',
+            $aujourdhui
+        )->count();
 
-    $devisEnAttente = DemandeDevis::where(
-        'statut',
-        'en_attente'
-    )->count();
+        /*
+        |--------------------------------------------------------------------------
+        | PRODUITS
+        |--------------------------------------------------------------------------
+        */
 
-    $countAujourdhui = DemandeDevis::whereDate(
-        'created_at',
-        $aujourdhui
-    )->count();
+        $totalProduits = Product::count();
 
-    /*
-    |--------------------------------------------------------------------------
-    | PRODUITS
-    |--------------------------------------------------------------------------
-    */
+        $produitsSurCommande = Product::where(
+            'stock',
+            false
+        )->count();
 
-    $totalProduits = Product::count();
+        $countAujourdhuipro = Product::whereDate(
+            'created_at',
+            $aujourdhui
+        )->count();
 
-    $produitsSurCommande = Product::where(
-        'stock',
-        false
-    )->count();
+        /*
+        |--------------------------------------------------------------------------
+        | CATÉGORIES
+        |--------------------------------------------------------------------------
+        */
 
-    $countAujourdhuipro = Product::whereDate(
-        'created_at',
-        $aujourdhui
-    )->count();
+        $totalCategories = Category::count();
 
-    /*
-    |--------------------------------------------------------------------------
-    | CATÉGORIES
-    |--------------------------------------------------------------------------
-    */
+        $countAujourdhuicat = Category::whereDate(
+            'created_at',
+            $aujourdhui
+        )->count();
 
-    $totalCategories = Category::count();
+        /*
+        |--------------------------------------------------------------------------
+        | DOMAINES
+        |--------------------------------------------------------------------------
+        */
 
-    $countAujourdhuicat = Category::whereDate(
-        'created_at',
-        $aujourdhui
-    )->count();
+        $totalDomaines = Domaine::count();
 
-    /*
-    |--------------------------------------------------------------------------
-    | DOMAINES
-    |--------------------------------------------------------------------------
-    */
+        /*
+        |--------------------------------------------------------------------------
+        | ÉQUIPE
+        |--------------------------------------------------------------------------
+        */
 
-    $totalDomaines = Domaine::count();
+        $totalEquipe = Equipe::count();
 
-    /*
-    |--------------------------------------------------------------------------
-    | ÉQUIPE
-    |--------------------------------------------------------------------------
-    */
+        /*
+        |--------------------------------------------------------------------------
+        | COMMANDES
+        |--------------------------------------------------------------------------
+        */
 
-    $totalEquipe = Equipe::count();
+        $totalCommandes = Commande::count();
 
-    /*
-    |--------------------------------------------------------------------------
-    | COMMANDES
-    |--------------------------------------------------------------------------
-    */
+        $commandesAujourdhui = Commande::whereDate(
+            'created_at',
+            $aujourdhui
+        )->count();
 
-    $totalCommandes = Commande::count();
+        $nouvellesCommandes = Commande::where(
+            'statut',
+            'recue'
+        )->count();
 
-    $commandesAujourdhui = Commande::whereDate(
-        'created_at',
-        $aujourdhui
-    )->count();
+        /*
+        |--------------------------------------------------------------------------
+        | DERNIÈRES COMMANDES
+        |--------------------------------------------------------------------------
+        */
 
-    $nouvellesCommandes = Commande::where(
-        'statut',
-        'recue'
-    )->count();
+        $dernieresCommandes = Commande::with('items')
+            ->latest()
+            ->take(4)
+            ->get();
 
-    /*
-    |--------------------------------------------------------------------------
-    | DERNIÈRES COMMANDES
-    |--------------------------------------------------------------------------
-    */
+        /*
+        |--------------------------------------------------------------------------
+        | DERNIÈRES DEMANDES DE DEVIS
+        |--------------------------------------------------------------------------
+        */
 
-    $dernieresCommandes = Commande::with('items')
-        ->latest()
-        ->take(4)
-        ->get();
+        $dernieresDemandes = DemandeDevis::latest()
+            ->take(4)
+            ->get();
 
-    /*
-    |--------------------------------------------------------------------------
-    | DERNIÈRES DEMANDES DE DEVIS
-    |--------------------------------------------------------------------------
-    */
+        /*
+        |--------------------------------------------------------------------------
+        | GRAPHIQUE 1 : ÉVOLUTION SUR LES 7 DERNIERS JOURS
+        |--------------------------------------------------------------------------
+        */
 
-    $dernieresDemandes = DemandeDevis::latest()
-        ->take(4)
-        ->get();
+        $dateDebut = now()->subDays(6)->startOfDay();
+        $dateFin = now()->endOfDay();
 
-    /*
-    |--------------------------------------------------------------------------
-    | GRAPHIQUE 1 : ÉVOLUTION SUR LES 7 DERNIERS JOURS
-    |--------------------------------------------------------------------------
-    | Les données proviennent directement des tables commandes
-    | et demandes_devis.
-    */
+        // Préparer les 7 jours, même ceux sans activité.
+        $jours = collect();
 
-    $dateDebut = now()->subDays(6)->startOfDay();
-    $dateFin = now()->endOfDay();
+        for ($i = 0; $i < 7; $i++) {
+            $date = $dateDebut->copy()->addDays($i);
 
-    // Préparer les 7 jours, même ceux sans activité.
-    $jours = collect();
+            $jours->put($date->format('Y-m-d'), [
+                'label' => $date->locale('fr')->translatedFormat('D d/m'),
+                'commandes' => 0,
+                'devis' => 0,
+            ]);
+        }
 
-    for ($i = 0; $i < 7; $i++) {
-        $date = $dateDebut->copy()->addDays($i);
+        // Nombre réel de commandes par jour.
+        $commandesParJour = Commande::query()
+            ->whereBetween('created_at', [$dateDebut, $dateFin])
+            ->selectRaw('DATE(created_at) as jour, COUNT(*) as total')
+            ->groupByRaw('DATE(created_at)')
+            ->pluck('total', 'jour');
 
-        $jours->put($date->format('Y-m-d'), [
-            'label' => $date->locale('fr')->translatedFormat('D d/m'),
-            'commandes' => 0,
-            'devis' => 0,
-        ]);
-    }
+        // Nombre réel de demandes de devis par jour.
+        $devisParJour = DemandeDevis::query()
+            ->whereBetween('created_at', [$dateDebut, $dateFin])
+            ->selectRaw('DATE(created_at) as jour, COUNT(*) as total')
+            ->groupByRaw('DATE(created_at)')
+            ->pluck('total', 'jour');
 
-    // Nombre réel de commandes par jour.
-    $commandesParJour = Commande::query()
-        ->whereBetween('created_at', [$dateDebut, $dateFin])
-        ->selectRaw('DATE(created_at) as jour, COUNT(*) as total')
-        ->groupByRaw('DATE(created_at)')
-        ->pluck('total', 'jour');
+        // Transformer la collection en tableau standard pour éviter l'erreur de modification indirecte
+        $joursTableau = $jours->toArray();
 
-    // Nombre réel de demandes de devis par jour.
-    $devisParJour = DemandeDevis::query()
-        ->whereBetween('created_at', [$dateDebut, $dateFin])
-        ->selectRaw('DATE(created_at) as jour, COUNT(*) as total')
-        ->groupByRaw('DATE(created_at)')
-        ->pluck('total', 'jour');
+        // Compléter les jours avec les résultats de la base.
+        foreach ($joursTableau as $date => $donnees) {
+            $joursTableau[$date]['commandes'] = (int) (
+                $commandesParJour[$date] ?? 0
+            );
 
-    // Compléter les jours avec les résultats de la base.
- // Transformer la collection en tableau standard pour éviter l'erreur de modification indirecte
-    $joursTableau = $jours->toArray();
+            $joursTableau[$date]['devis'] = (int) (
+                $devisParJour[$date] ?? 0
+            );
+        }
 
-    // Compléter les jours avec les résultats de la base.
-    foreach ($joursTableau as $date => $donnees) {
-        $joursTableau[$date]['commandes'] = (int) (
-            $commandesParJour[$date] ?? 0
+        $jours = collect($joursTableau);
+
+        $graphiqueEvolution = [
+            'labels' => $jours->pluck('label')->values(),
+            'commandes' => $jours->pluck('commandes')->values(),
+            'devis' => $jours->pluck('devis')->values(),
+        ];
+
+        /*
+        |--------------------------------------------------------------------------
+        | GRAPHIQUE 2 : RÉPARTITION DES COMMANDES PAR STATUT
+        |--------------------------------------------------------------------------
+        */
+
+        $commandesParStatut = Commande::query()
+            ->selectRaw('statut, COUNT(*) as total')
+            ->groupBy('statut')
+            ->orderBy('statut')
+            ->get();
+
+        $libellesStatuts = [
+            'recue' => 'Nouvelle / Reçue',
+            'en_cours' => 'En cours',
+            'en_traitement' => 'En traitement',
+            'terminee' => 'Terminée',
+            'livree' => 'Livrée',
+            'annulee' => 'Annulée',
+            'annule' => 'Annulée',
+        ];
+
+        $graphiqueStatuts = [
+            'labels' => $commandesParStatut->map(
+                function ($item) use ($libellesStatuts) {
+                    $statut = (string) ($item->statut ?? 'non_defini');
+
+                    return $libellesStatuts[$statut]
+                        ?? ucfirst(str_replace('_', ' ', $statut));
+                }
+            )->values(),
+
+            'valeurs' => $commandesParStatut
+                ->pluck('total')
+                ->map(fn ($total) => (int) $total)
+                ->values(),
+        ];
+
+        /*
+        |--------------------------------------------------------------------------
+        | STATISTIQUES DE VISITES
+        |--------------------------------------------------------------------------
+        */
+
+        $statsVisites = Visit::yearEvolution();
+
+        /*
+        |--------------------------------------------------------------------------
+        | ENVOYER LES DONNÉES À LA VUE
+        |--------------------------------------------------------------------------
+        */
+
+        return view(
+            'admin.accueil',
+            compact(
+                'admin',
+
+                // Devis
+                'totalDevis',
+                'devisEnAttente',
+                'dernieresDemandes',
+                'countAujourdhui',
+
+                // Produits
+                'totalProduits',
+                'produitsSurCommande',
+                'countAujourdhuipro',
+
+                // Catégories
+                'totalCategories',
+                'countAujourdhuicat',
+
+                // Domaines
+                'totalDomaines',
+
+                // Équipe
+                'totalEquipe',
+
+                // Commandes
+                'totalCommandes',
+                'commandesAujourdhui',
+                'nouvellesCommandes',
+                'dernieresCommandes',
+
+                // Graphiques dynamiques
+                'graphiqueEvolution',
+                'graphiqueStatuts',
+                'statsVisites'
+            )
         );
-
-        $joursTableau[$date]['devis'] = (int) (
-            $devisParJour[$date] ?? 0
-        );
     }
-
-    // Reconvertir en collection si besoin pour la suite, ou utiliser directement le tableau
-    $jours = collect($joursTableau);
-
-
-    $graphiqueEvolution = [
-        'labels' => $jours->pluck('label')->values(),
-        'commandes' => $jours->pluck('commandes')->values(),
-        'devis' => $jours->pluck('devis')->values(),
-    ];
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | GRAPHIQUE 2 : RÉPARTITION DES COMMANDES PAR STATUT
-    |--------------------------------------------------------------------------
-    | Les statuts sont récupérés depuis la base.
-    | Aucun chiffre n'est codé en dur.
-    */
-
-    $commandesParStatut = Commande::query()
-        ->selectRaw('statut, COUNT(*) as total')
-        ->groupBy('statut')
-        ->orderBy('statut')
-        ->get();
-
-    $libellesStatuts = [
-        'recue' => 'Nouvelle / Reçue',
-        'en_cours' => 'En cours',
-        'en_traitement' => 'En traitement',
-        'terminee' => 'Terminée',
-        'livree' => 'Livrée',
-        'annulee' => 'Annulée',
-        'annule' => 'Annulée',
-    ];
-
-    $graphiqueStatuts = [
-        'labels' => $commandesParStatut->map(
-            function ($item) use ($libellesStatuts) {
-                $statut = (string) ($item->statut ?? 'non_defini');
-
-                return $libellesStatuts[$statut]
-                    ?? ucfirst(str_replace('_', ' ', $statut));
-            }
-        )->values(),
-
-        'valeurs' => $commandesParStatut
-            ->pluck('total')
-            ->map(fn ($total) => (int) $total)
-            ->values(),
-    ];
-
-    $statsVisites = Visit::yearEvolution();
-
-    /*
-    |--------------------------------------------------------------------------
-    | ENVOYER LES DONNÉES À LA VUE
-    |--------------------------------------------------------------------------
-    */
-
-    return view(
-        'admin.accueil',
-        compact(
-            'admin',
-
-            // Devis
-            'totalDevis',
-            'devisEnAttente',
-            'dernieresDemandes',
-            'countAujourdhui',
-
-            // Produits
-            'totalProduits',
-            'produitsSurCommande',
-            'countAujourdhuipro',
-
-            // Catégories
-            'totalCategories',
-            'countAujourdhuicat',
-
-            // Domaines
-            'totalDomaines',
-
-            // Équipe
-            'totalEquipe',
-
-            // Commandes
-            'totalCommandes',
-            'commandesAujourdhui',
-            'nouvellesCommandes',
-            'dernieresCommandes',
-
-            // Graphiques dynamiques
-            'graphiqueEvolution',
-            'graphiqueStatuts',
-            'statsVisites'
-        )
-    );
-}
 
     /**
      * ==============================
@@ -455,6 +450,7 @@ public function dashboard()
 
     /**
      * Modifier le mot de passe.
+     * Toutes les autres sessions de l'administrateur sont déconnectées.
      */
     public function updatePassword(Request $request)
     {
@@ -470,7 +466,10 @@ public function dashboard()
             'password' => [
                 'required',
                 'string',
-                'min:8',
+                'min:12',
+                'regex:/[A-Za-z]/',
+                'regex:/[0-9]/',
+                'regex:/[^A-Za-z0-9]/',
                 'confirmed',
             ],
         ], [
@@ -481,7 +480,10 @@ public function dashboard()
                 'Veuillez saisir un nouveau mot de passe.',
 
             'password.min' =>
-                'Le nouveau mot de passe doit contenir au moins 8 caractères.',
+                'Le nouveau mot de passe doit contenir au moins 12 caractères.',
+
+            'password.regex' =>
+                'Le mot de passe doit contenir des lettres, des chiffres et au moins un symbole (par exemple ! @ # $).',
 
             'password.confirmed' =>
                 'La confirmation du mot de passe ne correspond pas.',
@@ -522,10 +524,26 @@ public function dashboard()
             ),
         ]);
 
+        $admin->refresh();
+
+        // Invalide aussi les connexions "se souvenir de moi" des autres appareils
+        if (Schema::hasColumn('admins', 'remember_token')) {
+            $admin->setRememberToken(Str::random(60));
+            $admin->save();
+        }
+
+        // Cette session reste valide : on met à jour son empreinte.
+        // Toutes les autres sessions seront coupées à leur prochaine requête.
+        $request->session()->put(
+            'admin_pw_hash',
+            hash('sha256', (string) $admin->mot_de_passe)
+        );
+        $request->session()->regenerate();
+
 
         return back()->with(
             'success',
-            'Votre mot de passe a été modifié avec succès.'
+            'Votre mot de passe a été modifié. Les autres appareils ont été déconnectés.'
         );
     }
 

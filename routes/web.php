@@ -14,29 +14,8 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\RealisationController;
 use App\Http\Controllers\SousCategorieController;
 
-
 use App\Http\Controllers\Admin\DechargeController;
-
 use App\Http\Controllers\Admin\ProcurationController;
-
-Route::prefix('admin')->group(function () {
-    Route::get('/procurations', [ProcurationController::class, 'index'])->name('admin.procurations.index');
-    Route::post('/procurations', [ProcurationController::class, 'store'])->name('admin.procurations.store');
-    Route::get('/procurations/{id}/pdf', [ProcurationController::class, 'viewPdf'])->name('admin.procurations.pdf.view');
-    Route::get('/procurations/{id}/download', [ProcurationController::class, 'downloadPdf'])->name('admin.procurations.pdf.download');
-});
-
-Route::prefix('admin')->group(function () {
-    Route::get('/decharges', [DechargeController::class, 'index'])->name('admin.decharges.index');
-    Route::post('/decharges', [DechargeController::class, 'store'])->name('admin.decharges.store');
-    Route::get('/decharges/{decharge}/pdf', [DechargeController::class, 'pdf'])->name('admin.decharges.pdf');
-});
-
-
-    Route::get('/procuration',function(){
-    return view('admin.procuration');
-    });
-
 
 /*
 |--------------------------------------------------------------------------
@@ -48,14 +27,14 @@ Route::prefix('admin')->group(function () {
 Route::get('/Administateur', [AdminAuthController::class, 'showLogin'])
     ->name('admin.login');
 
-// Traitement de la connexion
+// Traitement de la connexion (5 tentatives maximum par minute)
 Route::post('/Administateur/login', [AdminAuthController::class, 'login'])
+    ->middleware('throttle:5,1')
     ->name('admin.login.submit');
 
 // Déconnexion
 Route::post('/Administateur/logout', [AdminAuthController::class, 'logout'])
     ->name('admin.logout');
-
 
 
 /*
@@ -69,6 +48,7 @@ Route::post('/Administateur/logout', [AdminAuthController::class, 'logout'])
 
 Route::middleware([
     \App\Http\Middleware\AdminAuthMiddleware::class,
+    \App\Http\Middleware\AdminSessionGuard::class,
     \App\Http\Middleware\AdminNoCache::class,
 ])->group(function () {
 
@@ -183,5 +163,26 @@ Route::middleware([
         ->name('admin.commandes');
 
     Route::post('/commande/{commande}/devis', [CommandeController::class, 'envoyerDevis'])
-    ->name('commande.devis');
+        ->name('commande.devis');
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PROCURATIONS & DÉCHARGES (désormais protégées)
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('admin')->group(function () {
+        Route::get('/procurations', [ProcurationController::class, 'index'])->name('admin.procurations.index');
+        Route::post('/procurations', [ProcurationController::class, 'store'])->name('admin.procurations.store');
+        Route::get('/procurations/{id}/pdf', [ProcurationController::class, 'viewPdf'])->name('admin.procurations.pdf.view');
+        Route::get('/procurations/{id}/download', [ProcurationController::class, 'downloadPdf'])->name('admin.procurations.pdf.download');
+
+        Route::get('/decharges', [DechargeController::class, 'index'])->name('admin.decharges.index');
+        Route::post('/decharges', [DechargeController::class, 'store'])->name('admin.decharges.store');
+        Route::get('/decharges/{decharge}/pdf', [DechargeController::class, 'pdf'])->name('admin.decharges.pdf');
+    });
+
+    Route::get('/procuration', function () {
+        return view('admin.procuration');
+    });
 });
