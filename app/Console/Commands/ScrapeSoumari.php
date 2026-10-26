@@ -2,25 +2,25 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Category;
-use App\Models\Product;
-use App\Models\SousCategorie;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\DomCrawler\Crawler;
+use App\Models\Category;
+use App\Models\SousCategorie;
+use App\Models\Product;
 
-class ScrapeSoumari extends Command
+class ScrapeSoumariLampeSolaire extends Command
 {
     protected $signature = 'soumari:scrape
-                            {--url= : URL de la catégorie à importer (par défaut : Support TV)}
-                            {--max-pages=10 : Nombre maximum de pages}
+                            {--url= : URL de la catégorie à importer (par défaut : Lampe Solaire)}
+                            {--max-pages=20 : Nombre maximum de pages}
                             {--dry-run : Affiche ce qui serait importé, sans rien écrire}';
 
-    protected $description = 'Importe les produits de Soumari (catégorie Support TV) avec photos, classés automatiquement, prix à NULL';
+    protected $description = 'Importe les produits de Soumari (Énergie Solaire) avec photos, classés automatiquement, prix à NULL';
 
-    private const URL_PAR_DEFAUT = 'https://www.soumari.com/categorie-produit/television/support-tv/';
+    private const URL_PAR_DEFAUT = 'https://www.soumari.com/categorie-produit/energie-solaire/lampe-solaire/';
 
     private int $importes = 0;
     private int $sansPhoto = 0;
@@ -32,7 +32,7 @@ class ScrapeSoumari extends Command
         $base = rtrim($this->option('url') ?: self::URL_PAR_DEFAUT, '/') . '/';
         $maxPages = max(1, (int) $this->option('max-pages'));
 
-        $this->info($dry ? 'MODE TEST : rien ne sera écrit.' : 'Import en cours...');
+        $this->info($dry ? 'MODE TEST : rien ne sera écrit.' : 'Import en cours de Soumari (Lampe Solaire)...');
 
         for ($page = 1; $page <= $maxPages; $page++) {
             $url = $page === 1 ? $base : $base . 'page/' . $page . '/';
@@ -50,7 +50,7 @@ class ScrapeSoumari extends Command
             $produits = $crawler->filter('li.product');
 
             if ($produits->count() === 0) {
-                $this->info('Aucun produit trouvé. Fin.');
+                $this->info('Aucun produit trouvé sur cette page. Fin.');
                 break;
             }
 
@@ -74,7 +74,7 @@ class ScrapeSoumari extends Command
 
     private function traiter(Crawler $node, bool $dry): void
     {
-        $lien = $node->filter('h2 a');
+        $lien = $node->filter('h2 a, .woocommerce-loop-product__link');
         if ($lien->count() === 0) {
             return;
         }
@@ -101,24 +101,25 @@ class ScrapeSoumari extends Command
             $imagesCandidates[] = $imageListe;
         }
 
-        $description = '';
+        $description = 'Produit importé depuis Soumari';
         $page = $this->requete($urlProduit);
 
         if ($page && $page->successful()) {
             $crawlerProduit = new Crawler($page->body());
 
             $descNode = $crawlerProduit->filter(
-                '.woocommerce-product-details__short-description, #tab-description, .woocommerce-Tabs-panel--description'
+                '.woocommerce-product-details__short-description, #tab-description, .woocommerce-Tabs-panel--description, .description'
             );
             if ($descNode->count() > 0) {
                 $description = $this->nettoyerDescription($descNode->first()->text());
             }
 
-            $galerie = $crawlerProduit->filter('.woocommerce-product-gallery__image img');
+            $galerie = $crawlerProduit->filter('.woocommerce-product-gallery__image img, .wp-post-image');
             if ($galerie->count() > 0) {
-                foreach (['data-large_image', 'data-src', 'src'] as $attr) {
+                foreach (['data-large_image', 'data-src', 'data-lazy-src', 'src'] as $attr) {
                     $valeur = $galerie->first()->attr($attr);
                     if ($valeur && !str_starts_with($valeur, 'data:')) {
+                        $imagesCandidates[] = $this->versionOriginale($valeur);
                         $imagesCandidates[] = $valeur;
                         break;
                     }
@@ -175,32 +176,26 @@ class ScrapeSoumari extends Command
     }
 
     /**
-     * Classement intelligent : [catégorie principale, sous-catégorie].
+     * Classement intelligent centré sur l'Énergie Solaire.
      */
     private function classer(string $nom): array
     {
         $t = Str::lower(Str::ascii($nom));
 
-        if (str_contains($t, 'micro onde')) {
-            return ['Électricité', 'Supports Muraux Électroménager'];
+        if (str_contains($t, 'lampadaire') || str_contains($t, 'projecteur')) {
+            return ['Énergie Solaire', 'Lampadaires & Projecteurs Solaires'];
         }
-        if (str_contains($t, 'moniteur')) {
-            return ['Informatique', 'Supports de Moniteur'];
+        if (str_contains($t, 'torche') || str_contains($t, 'lampe')) {
+            return ['Énergie Solaire', 'Lampes & Torches Solaires'];
         }
-        if (str_contains($t, 'decodeur')) {
-            return ['Télécoms & Réseau', 'Supports Décodeur'];
+        if (str_contains($t, 'panneau')) {
+            return ['Énergie Solaire', 'Panneaux Solaires'];
         }
-        if (str_contains($t, 'chariot') || str_contains($t, 'mobile')) {
-            return ['Informatique', 'Supports TV Mobiles'];
-        }
-        if (str_contains($t, 'plafond')) {
-            return ['Informatique', 'Supports TV Plafond'];
-        }
-        if (str_contains($t, 'sur pied')) {
-            return ['Informatique', 'Supports TV sur Pied'];
+        if (str_contains($t, 'batterie') || str_contains($t, 'onduleur') || str_contains($t, 'kit')) {
+            return ['Énergie Solaire', 'Kits & Batteries Solaires'];
         }
 
-        return ['Informatique', 'Supports TV Muraux'];
+        return ['Énergie Solaire', 'Shop'];
     }
 
     private function imageDepuisListe(Crawler $node): ?string
@@ -232,12 +227,17 @@ class ScrapeSoumari extends Command
     {
         foreach (array_unique(array_filter($urls)) as $url) {
             try {
+                // Si l'URL est relative, on la complète
+                if (str_starts_with($url, '/')) {
+                    $url = 'https://www.soumari.com' . $url;
+                }
+
                 $reponse = Http::withHeaders($this->entetes())->timeout(30)->get($url);
 
                 if (
                     $reponse->successful()
                     && str_starts_with((string) $reponse->header('Content-Type'), 'image/')
-                    && strlen($reponse->body()) > 1000
+                    && strlen($reponse->body()) > 500
                 ) {
                     $ext = strtolower(pathinfo((string) parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION)) ?: 'jpg';
                     $chemin = 'products/' . Str::slug($nom) . '-' . Str::random(6) . '.' . $ext;
@@ -254,16 +254,13 @@ class ScrapeSoumari extends Command
         return null;
     }
 
-    /**
-     * Retire les phrases parasites : mentions de la source, livraison, texte d'IA.
-     */
     private function nettoyerDescription(string $texte): string
     {
         $texte = preg_replace('/ChatGPT a dit\s*:?/iu', '', $texte);
         $texte = Str::squish((string) $texte);
 
         $phrases = preg_split('/(?<=[.!?])\s+/u', $texte) ?: [];
-        $phrases = array_filter($phrases, fn ($p) => !preg_match('/soumari|livr|achetez|dakar|s[eé]n[eé]gal/iu', $p));
+        $phrases = array_filter($phrases, fn ($p) => !preg_match('/soumari|livr|achetez/iu', $p));
 
         return Str::limit(trim(implode(' ', $phrases)), 1500, '');
     }
@@ -281,8 +278,9 @@ class ScrapeSoumari extends Command
     private function entetes(): array
     {
         return [
-            'User-Agent'      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
+            'User-Agent'      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept-Language' => 'fr-FR,fr;q=0.9',
+            'Referer'         => 'https://www.soumari.com/',
         ];
     }
 }
