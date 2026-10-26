@@ -68,14 +68,6 @@ class ScrapeSoumariLampeSolaire extends Command
                             $imgUrl = 'https://www.soumari.com' . $imgUrl;
                         }
 
-                        // ----------------------------------------------------
-                        // RÈGLE STRICTE : AUCUN PRODUIT SANS PHOTO
-                        // ----------------------------------------------------
-                        if (!$imgUrl) {
-                            $this->line("    [IGNORÉ - Pas d'URL image] {$productName}");
-                            return;
-                        }
-
                         $description = "Produit importé depuis Soumari";
                         $sousCatName = "Lampe Solaire";
 
@@ -103,25 +95,28 @@ class ScrapeSoumariLampeSolaire extends Command
 
                         // Téléchargement sécurisé de l'image avec User-Agent et Referer
                         $photoPath = null;
-                        try {
-                            $imageResponse = Http::withHeaders([
-                                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                                'Referer' => 'https://www.soumari.com/',
-                            ])->timeout(15)->get($imgUrl);
+                        if ($imgUrl) {
+                            try {
+                                $imageResponse = Http::withHeaders([
+                                    'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                                    'Referer' => 'https://www.soumari.com/',
+                                ])->timeout(15)->get($imgUrl);
 
-                            if ($imageResponse->successful()) {
-                                $imageName = 'products/' . Str::slug($productName) . '-' . time() . '.jpg';
-                                Storage::disk('public')->put($imageName, $imageResponse->body());
-                                $photoPath = $imageName;
-                            }
-                        } catch (\Exception $ex) {}
-
-                        // Si le téléchargement échoue, on ignore le produit
-                        if (!$photoPath) {
-                            $this->line("    [IGNORÉ - Échec téléchargement image] {$productName}");
-                            return;
+                                if ($imageResponse->successful()) {
+                                    $imageName = 'products/' . Str::slug($productName) . '-' . time() . '.jpg';
+                                    Storage::disk('public')->put($imageName, $imageResponse->body());
+                                    $photoPath = $imageName;
+                                }
+                            } catch (\Exception $ex) {}
                         }
-                        // ----------------------------------------------------
+
+                        // SÉCURITÉ : Si le téléchargement échoue, on assigne une image par défaut au lieu d'ignorer le produit
+                        if (!$photoPath) {
+                            $photoPath = 'products/default.jpg';
+                            $this->line("    [AVERTISSEMENT - Image par défaut utilisée] {$productName}");
+                        } else {
+                            $this->line("    [SUCCÈS IMAGE] {$productName}");
+                        }
 
                         // IA / Logique de classification (Centrée sur Énergie Solaire)
                         $mainCategoryName = $this->mapToMainCategory($productName . ' ' . $sousCatName);
@@ -146,7 +141,7 @@ class ScrapeSoumariLampeSolaire extends Command
                             ]
                         );
 
-                        $this->line("    [SUCCÈS] {$productName} -> [{$category->nom} > {$sousCat->nom}]");
+                        $this->line("    [ENREGISTRÉ] {$productName} -> [{$category->nom} > {$sousCat->nom}]");
 
                     } catch (\Exception $e) {}
                 });
