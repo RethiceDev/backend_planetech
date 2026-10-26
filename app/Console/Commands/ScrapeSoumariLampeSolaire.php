@@ -91,15 +91,19 @@ class ScrapeSoumariLampeSolaire extends Command
                         }
 
                         // Téléchargement de l'image
-                        $photoPath = null;
-                        try {
-                            $imageResponse = Http::timeout(15)->get($imgUrl);
-                            if ($imageResponse->successful()) {
-                                $imageName = 'products/' . Str::slug($productName) . '-' . time() . '.jpg';
-                                Storage::disk('public')->put($imageName, $imageResponse->body());
-                                $photoPath = $imageName;
-                            }
-                        } catch (\Exception $ex) {}
+                       // Téléchargement sécurisé de l'image avec un User-Agent pour éviter le blocage
+$photoPath = null;
+try {
+    $imageResponse = Http::withHeaders([
+        'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    ])->timeout(15)->get($imgUrl);
+
+    if ($imageResponse->successful()) {
+        $imageName = 'products/' . Str::slug($productName) . '-' . time() . '.jpg';
+        Storage::disk('public')->put($imageName, $imageResponse->body());
+        $photoPath = $imageName;
+    }
+} catch (\Exception $ex) {}
 
                         // Si le téléchargement échoue, on ignore le produit
                         if (!$photoPath) {
