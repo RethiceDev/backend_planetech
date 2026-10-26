@@ -92,10 +92,12 @@ class ScrapeSoumariLampeSolaire extends Command
 
                         // Téléchargement de l'image
                        // Téléchargement sécurisé de l'image avec un User-Agent pour éviter le blocage
+// Téléchargement sécurisé avec User-Agent et Referer
 $photoPath = null;
 try {
     $imageResponse = Http::withHeaders([
         'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer' => 'https://www.soumari.com/',
     ])->timeout(15)->get($imgUrl);
 
     if ($imageResponse->successful()) {
@@ -104,6 +106,7 @@ try {
         $photoPath = $imageName;
     }
 } catch (\Exception $ex) {}
+
 
                         // Si le téléchargement échoue, on ignore le produit
                         if (!$photoPath) {
