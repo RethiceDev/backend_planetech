@@ -93,10 +93,10 @@ class ScrapeSoumariLampeSolaire extends Command
                         // Téléchargement de l'image
                         $photoPath = null;
                         try {
-                            $imageContents = @file_get_contents($imgUrl);
-                            if ($imageContents) {
+                            $imageResponse = Http::timeout(15)->get($imgUrl);
+                            if ($imageResponse->successful()) {
                                 $imageName = 'products/' . Str::slug($productName) . '-' . time() . '.jpg';
-                                Storage::disk('public')->put($imageName, $imageContents);
+                                Storage::disk('public')->put($imageName, $imageResponse->body());
                                 $photoPath = $imageName;
                             }
                         } catch (\Exception $ex) {}
