@@ -54,8 +54,19 @@ class ScrapeSoumariLampeSolaire extends Command
                         $linkNode = $node->filter('a.woocommerce-LoopProduct-link, a');
                         $productUrl = $linkNode->count() > 0 ? $linkNode->attr('href') : null;
 
+                        // Extraction intelligente et robuste de l'URL de l'image
                         $imgNode = $node->filter('img');
-                        $imgUrl = $imgNode->count() > 0 ? ($imgNode->attr('data-src') ?: $imgNode->attr('src')) : null;
+                        $imgUrl = null;
+                        if ($imgNode->count() > 0) {
+                            $imgUrl = $imgNode->attr('data-src')
+                                   ?: ($imgNode->attr('data-large_image')
+                                   ?: ($imgNode->attr('src') ?: null));
+                        }
+
+                        // Si l'URL est relative, on la complète
+                        if ($imgUrl && str_starts_with($imgUrl, '/')) {
+                            $imgUrl = 'https://www.soumari.com' . $imgUrl;
+                        }
 
                         // ----------------------------------------------------
                         // RÈGLE STRICTE : AUCUN PRODUIT SANS PHOTO
@@ -90,23 +101,20 @@ class ScrapeSoumariLampeSolaire extends Command
                             } catch (\Exception $ex) {}
                         }
 
-                        // Téléchargement de l'image
-                       // Téléchargement sécurisé de l'image avec un User-Agent pour éviter le blocage
-// Téléchargement sécurisé avec User-Agent et Referer
-$photoPath = null;
-try {
-    $imageResponse = Http::withHeaders([
-        'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer' => 'https://www.soumari.com/',
-    ])->timeout(15)->get($imgUrl);
+                        // Téléchargement sécurisé de l'image avec User-Agent et Referer
+                        $photoPath = null;
+                        try {
+                            $imageResponse = Http::withHeaders([
+                                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                                'Referer' => 'https://www.soumari.com/',
+                            ])->timeout(15)->get($imgUrl);
 
-    if ($imageResponse->successful()) {
-        $imageName = 'products/' . Str::slug($productName) . '-' . time() . '.jpg';
-        Storage::disk('public')->put($imageName, $imageResponse->body());
-        $photoPath = $imageName;
-    }
-} catch (\Exception $ex) {}
-
+                            if ($imageResponse->successful()) {
+                                $imageName = 'products/' . Str::slug($productName) . '-' . time() . '.jpg';
+                                Storage::disk('public')->put($imageName, $imageResponse->body());
+                                $photoPath = $imageName;
+                            }
+                        } catch (\Exception $ex) {}
 
                         // Si le téléchargement échoue, on ignore le produit
                         if (!$photoPath) {
