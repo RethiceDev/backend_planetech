@@ -3,153 +3,448 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\DechargeMail;
 use App\Models\Decharge;
 use App\Models\DechargeItem;
-use App\Mail\DechargeMail;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class DechargeController extends Controller
 {
+    /**
+     * Afficher la liste des décharges.
+     */
     public function index()
     {
-        $decharges = Decharge::with('items')->latest()->paginate(10);
+        $decharges = Decharge::with('items')
+            ->latest()
+            ->paginate(10);
+
         return view('admin.decharges', compact('decharges'));
     }
 
+    /**
+     * Enregistrer une nouvelle décharge.
+     */
     public function store(Request $request)
     {
+        /*
+        |--------------------------------------------------------------------------
+        | 1. Validation des données
+        |--------------------------------------------------------------------------
+        */
+
         $validated = $request->validate([
-            'nom'        => 'required|string|max:255',
-            'role'       => 'required|string|max:255',
-            'entreprise' => 'nullable|string|max:255',
-            'numero'     => 'required|string|max:50',
-            'email'      => 'required|email|max:255',
-            'type'       => 'required|in:argent,materiel,responsabilite',
+            // Informations du bénéficiaire
+            'nom' => ['required', 'string', 'max:255'],
+            'role' => ['required', 'string', 'max:255'],
+            'entreprise' => ['nullable', 'string', 'max:255'],
+            'numero' => ['required', 'string', 'max:50'],
+            'email' => ['required', 'email', 'max:255'],
 
-            'somme'       => 'required_if:type,argent|nullable|numeric|min:0',
-            'motif'       => 'required_if:type,argent|nullable|string|max:255',
-            'description' => 'required_if:type,responsabilite|nullable|string',
+            // Type de décharge
+            'type' => [
+                'required',
+                'in:argent,materiel,responsabilite',
+            ],
 
-            'materiels'               => 'required_if:type,materiel|nullable|array',
-            'materiels.*.designation' => 'required_if:type,materiel|nullable|string|max:255',
-            'materiels.*.quantite'    => 'required_if:type,materiel|nullable|integer|min:1',
-            'materiels.*.etat'        => 'required_if:type,materiel|nullable|in:neuf,partiellement_utilise,vieux,defectueux',
+            // Fournisseur / livreur
+            'fournisseur_nom' => [
+                'required_if:type,materiel',
+                'nullable',
+                'string',
+                'max:255',
+            ],
 
-            'signature_data' => 'required|string',
+            'fournisseur_entreprise' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'fournisseur_numero' => [
+                'required_if:type,materiel',
+                'nullable',
+                'string',
+                'max:50',
+            ],
+
+            'fournisseur_email' => [
+                'required_if:type,materiel',
+                'nullable',
+                'email',
+                'max:255',
+            ],
+
+            // Décharge d'argent
+            'somme' => [
+                'required_if:type,argent',
+                'nullable',
+                'numeric',
+                'min:0',
+            ],
+
+            'motif' => [
+                'required_if:type,argent',
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            // Décharge de responsabilité
+            'description' => [
+                'required_if:type,responsabilite',
+                'nullable',
+                'string',
+                'max:10000',
+            ],
+
+            // Liste des matériels
+            'materiels' => [
+                'required_if:type,materiel',
+                'nullable',
+                'array',
+                'min:1',
+            ],
+
+            'materiels.*.designation' => [
+                'required_if:type,materiel',
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'materiels.*.quantite' => [
+                'nullable',
+                'integer',
+                'min:1',
+            ],
+
+            'materiels.*.prix_unitaire' => [
+                'nullable',
+                'numeric',
+                'min:0',
+                'max:9999999999.99',
+            ],
+
+            'materiels.*.prix_global' => [
+                'nullable',
+                'numeric',
+                'min:0',
+                'max:9999999999.99',
+            ],
+
+            'materiels.*.etat' => [
+                'required_if:type,materiel',
+                'nullable',
+                'in:neuf,partiellement_utilise,vieux,defectueux',
+            ],
+
+            // Signature numérique
+            'signature_data' => [
+                'required',
+                'string',
+                'regex:/^data:image\/png;base64,/',
+            ],
         ]);
 
         $type = $validated['type'];
 
-        // ---------- 1. ENREGISTREMENT EN BASE ----------
-        try {
-            DB::beginTransaction();
+        /*
+        |--------------------------------------------------------------------------
+        | 2. Vérifier les matériels avant la transaction
+        |--------------------------------------------------------------------------
+        */
 
-            $decharge = Decharge::create([
-                'nom'            => $validated['nom'],
-                'role'           => $validated['role'],
-                'entreprise'     => $validated['entreprise'] ?? null,
-                'numero'         => $validated['numero'],
-                'email'          => $validated['email'],
-                'type'           => $type,
-                'somme'          => $type === 'argent' ? ($validated['somme'] ?? null) : null,
-                'motif'          => $type === 'argent' ? ($validated['motif'] ?? null) : null,
-                'description'    => $type === 'responsabilite' ? ($validated['description'] ?? null) : null,
-                'signature_data' => $validated['signature_data'],
-            ]);
+        if ($type === 'materiel') {
+            $materiels = $validated['materiels'] ?? [];
 
-            if ($type === 'materiel') {
-                $count = 0;
-                foreach ($validated['materiels'] ?? [] as $item) {
-                    if (empty($item['designation'])) {
-                        continue;
-                    }
-                    DechargeItem::create([
-                        'decharge_id' => $decharge->id,
-                        'designation' => $item['designation'],
-                        'quantite'    => $item['quantite'] ?? 1,
-                        'etat'        => $item['etat'] ?? 'neuf',
-                    ]);
-                    $count++;
-                }
-
-                if ($count === 0) {
-                    throw new \RuntimeException('Ajoutez au moins un matériel avec une désignation.');
-                }
+            if (count($materiels) === 0) {
+                throw ValidationException::withMessages([
+                    'materiels' => 'Ajoutez au moins un matériel.',
+                ]);
             }
 
-            DB::commit();
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            Log::error('Erreur enregistrement décharge : ' . $e->getMessage());
+            foreach ($materiels as $index => $item) {
+                $designation = trim($item['designation'] ?? '');
 
-            return back()
-                ->with('error', "Erreur lors de l'enregistrement : " . $e->getMessage())
+                if ($designation === '') {
+                    throw ValidationException::withMessages([
+                        "materiels.$index.designation" =>
+                            'La désignation du matériel est obligatoire.',
+                    ]);
+                }
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 3. Enregistrement transactionnel
+        |--------------------------------------------------------------------------
+        */
+
+        try {
+            $decharge = DB::transaction(function () use (
+                $validated,
+                $type
+            ) {
+                $decharge = Decharge::create([
+                    'nom' => trim($validated['nom']),
+                    'role' => trim($validated['role']),
+
+                    'entreprise' => !empty($validated['entreprise'])
+                        ? trim($validated['entreprise'])
+                        : null,
+
+                    'numero' => trim($validated['numero']),
+                    'email' => strtolower(trim($validated['email'])),
+
+                    // Informations du fournisseur
+                    'fournisseur_nom' => $type === 'materiel'
+                        ? trim($validated['fournisseur_nom'])
+                        : null,
+
+                    'fournisseur_entreprise' => $type === 'materiel'
+                        ? (
+                            !empty($validated['fournisseur_entreprise'])
+                                ? trim($validated['fournisseur_entreprise'])
+                                : null
+                        )
+                        : null,
+
+                    'fournisseur_numero' => $type === 'materiel'
+                        ? trim($validated['fournisseur_numero'])
+                        : null,
+
+                    'fournisseur_email' => $type === 'materiel'
+                        ? strtolower(trim($validated['fournisseur_email']))
+                        : null,
+
+                    // Type de décharge
+                    'type' => $type,
+
+                    // Informations financières
+                    'somme' => $type === 'argent'
+                        ? ($validated['somme'] ?? null)
+                        : null,
+
+                    'motif' => $type === 'argent'
+                        ? ($validated['motif'] ?? null)
+                        : null,
+
+                    // Responsabilité
+                    'description' => $type === 'responsabilite'
+                        ? ($validated['description'] ?? null)
+                        : null,
+
+                    // Signature
+                    'signature_data' => $validated['signature_data'],
+                ]);
+
+                /*
+                |--------------------------------------------------------------------------
+                | 4. Enregistrer les lignes de matériels
+                |--------------------------------------------------------------------------
+                */
+
+                if ($type === 'materiel') {
+                    foreach ($validated['materiels'] as $item) {
+                        $designation = trim($item['designation']);
+
+                        $quantite = (
+                            isset($item['quantite'])
+                            && $item['quantite'] !== ''
+                        )
+                            ? (int) $item['quantite']
+                            : null;
+
+                        $prixUnitaire = (
+                            isset($item['prix_unitaire'])
+                            && $item['prix_unitaire'] !== ''
+                        )
+                            ? (float) $item['prix_unitaire']
+                            : null;
+
+                        $prixGlobal = (
+                            isset($item['prix_global'])
+                            && $item['prix_global'] !== ''
+                        )
+                            ? (float) $item['prix_global']
+                            : null;
+
+                        // Calculer le prix global uniquement s'il n'a
+                        // pas été renseigné et si les deux valeurs
+                        // nécessaires sont disponibles.
+                        if (
+                            $prixGlobal === null
+                            && $prixUnitaire !== null
+                            && $quantite !== null
+                        ) {
+                            $prixGlobal = round(
+                                $prixUnitaire * $quantite,
+                                2
+                            );
+                        }
+
+                        DechargeItem::create([
+                            'decharge_id' => $decharge->id,
+                            'designation' => $designation,
+                            'quantite' => $quantite,
+                            'prix_unitaire' => $prixUnitaire,
+                            'prix_global' => $prixGlobal,
+                            'etat' => $item['etat'],
+                        ]);
+                    }
+                }
+
+                return $decharge;
+            });
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            Log::error(
+                'Erreur lors de l’enregistrement d’une décharge.',
+                [
+                    'type' => $type,
+                    'exception' => get_class($e),
+                    'message' => $e->getMessage(),
+                    'fichier' => $e->getFile(),
+                    'ligne' => $e->getLine(),
+                    'trace' => $e->getTraceAsString(),
+                ]
+            );
+
+            return redirect()
+                ->back()
+                ->with(
+                    'error',
+                    "Une erreur est survenue lors de l'enregistrement de la décharge. Consultez les journaux Laravel pour identifier la cause."
+                )
                 ->withInput();
         }
 
-        // ---------- 2. ENVOI DES E-MAILS ----------
+        /*
+        |--------------------------------------------------------------------------
+        | 5. Recharger les relations
+        |--------------------------------------------------------------------------
+        */
+
         $decharge->load('items');
 
+        /*
+        |--------------------------------------------------------------------------
+        | 6. Préparer les destinataires
+        |--------------------------------------------------------------------------
+        */
+
+        $emailPrincipal = $type === 'materiel'
+            ? $decharge->fournisseur_email
+            : $decharge->email;
+
         $destinataires = collect([
-            $decharge->email,
+            $emailPrincipal,
             config('decharge.admin_email'),
         ])
-            ->filter()
+            ->filter(fn ($mail) => is_string($mail) && trim($mail) !== '')
             ->map(fn ($mail) => strtolower(trim($mail)))
             ->unique()
             ->values();
 
+        /*
+        |--------------------------------------------------------------------------
+        | 7. Envoyer les e-mails
+        |--------------------------------------------------------------------------
+        */
+
         $erreursMail = [];
 
-        foreach ($destinataires as $to) {
+        foreach ($destinataires as $destinataire) {
             try {
-                Mail::to($to)->send(new DechargeMail($decharge));
-            } catch (\Throwable $e) {
-                Log::error("Échec envoi décharge {$decharge->reference} à {$to} : " . $e->getMessage());
-                $erreursMail[] = $to . ' (' . $e->getMessage() . ')';
+                Mail::to($destinataire)->send(
+                    new DechargeMail($decharge)
+                );
+            } catch (Throwable $e) {
+                Log::error(
+                    'Échec de l’envoi de l’e-mail de décharge.',
+                    [
+                        'reference' => $decharge->reference,
+                        'destinataire' => $destinataire,
+                        'exception' => get_class($e),
+                        'message' => $e->getMessage(),
+                        'fichier' => $e->getFile(),
+                        'ligne' => $e->getLine(),
+                    ]
+                );
+
+                $erreursMail[] = $destinataire;
             }
         }
 
-        if (!empty($erreursMail)) {
-            return back()->with(
-                'error',
-                'Décharge ' . $decharge->reference . ' enregistrée, mais e-mail non envoyé à : ' . implode(' ; ', $erreursMail)
-            );
+        /*
+        |--------------------------------------------------------------------------
+        | 8. Message de retour
+        |--------------------------------------------------------------------------
+        */
+
+        if (count($erreursMail) > 0) {
+            return redirect()
+                ->back()
+                ->with(
+                    'warning',
+                    'La décharge '
+                    . $decharge->reference
+                    . ' a été enregistrée, mais certains e-mails n’ont pas pu être envoyés : '
+                    . implode(', ', $erreursMail)
+                );
         }
 
-        return back()->with(
-            'success',
-            'La décharge ' . $decharge->reference . ' a été établie et transmise par e-mail avec succès.'
-        );
+        return redirect()
+            ->back()
+            ->with(
+                'success',
+                'La décharge '
+                . $decharge->reference
+                . ' a été enregistrée et transmise par e-mail.'
+            );
     }
 
     /**
-     * Affiche (ou télécharge avec ?download=1) le PDF d'une décharge.
+     * Afficher ou télécharger le PDF d'une décharge.
      */
     public function pdf(Request $request, Decharge $decharge)
     {
         $decharge->load('items');
 
-        // Logo en base64 (DomPDF le lit sans accès réseau)
         $logo = null;
+
         $logoPath = public_path('images/logo.png');
-        if (file_exists($logoPath)) {
-            $logo = 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath));
+
+        if (is_file($logoPath) && is_readable($logoPath)) {
+            $logoContent = file_get_contents($logoPath);
+
+            if ($logoContent !== false) {
+                $logo = 'data:image/png;base64,'
+                    . base64_encode($logoContent);
+            }
         }
 
         $pdf = Pdf::loadView('pdf.decharge', [
             'decharge' => $decharge,
-            'logo'     => $logo,
+            'logo' => $logo,
         ])->setPaper('a4', 'portrait');
 
-        $filename = $decharge->reference . '.pdf';
+        $filename = ($decharge->reference ?: 'decharge-' . $decharge->id)
+            . '.pdf';
 
-        return $request->boolean('download')
-            ? $pdf->download($filename)
-            : $pdf->stream($filename);
+        if ($request->boolean('download')) {
+            return $pdf->download($filename);
+        }
+
+        return $pdf->stream($filename);
     }
 }

@@ -9,19 +9,9 @@ use Illuminate\Http\Request;
 class ProduitController extends Controller
 {
     /**
-     * Liste paginée et filtrée des produits de la boutique.
+     * Liste tous les produits sans restriction de stock ou de prix.
      *
      * GET /api/produits
-     *
-     * Paramètres (tous optionnels) :
-     * - category_id       : id de la catégorie principale
-     * - sous_categorie_id : id de la sous-catégorie
-     * - search            : mot-clé (nom, description, sous-catégorie, catégorie)
-     * - page              : numéro de la page
-     * - per_page          : nombre de produits par page (24 par défaut, 100 max)
-     *
-     * Réponse : objet paginé Laravel
-     * { data: [...], current_page, last_page, per_page, total, links: [...] }
      */
     public function listes(Request $request)
     {
@@ -35,8 +25,7 @@ class ProduitController extends Controller
 
         $perPage = (int) ($validated['per_page'] ?? 24);
 
-        $query = Product::with(['sousCategorie.category'])
-            ->where('stock', true);
+        $query = Product::with(['sousCategorie.category']);
 
         // Filtre par catégorie principale
         if ($request->filled('category_id')) {
@@ -56,7 +45,6 @@ class ProduitController extends Controller
         if ($request->filled('search')) {
             $terme = trim($validated['search']);
 
-            // Échapper les jokers LIKE saisis par l'utilisateur
             $terme = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $terme);
             $like  = '%' . $terme . '%';
 
@@ -72,8 +60,7 @@ class ProduitController extends Controller
             });
         }
 
-        // Tri stable : indispensable pour que la pagination ne répète
-        // ni ne saute aucun produit d'une page à l'autre.
+        // Tri stable et pagination
         $products = $query
             ->orderBy('sous_categorie_id')
             ->orderBy('name')

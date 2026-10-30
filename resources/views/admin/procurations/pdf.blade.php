@@ -8,14 +8,6 @@
             $logo = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($fichier));
         }
     }
-
-    // Signature + cachet : chargés automatiquement si le contrôleur ne les fournit pas
-    if (empty($cachet)) {
-        $cheminCachet = storage_path('app/private/cachet-signature.png');
-        if (is_file($cheminCachet)) {
-            $cachet = 'data:image/png;base64,' . base64_encode(file_get_contents($cheminCachet));
-        }
-    }
 @endphp
 
 <!DOCTYPE html>
@@ -44,10 +36,8 @@
         table.signature { width: 100%; border-collapse: collapse; margin-top: 30px; page-break-inside: avoid; }
         table.signature td.vide { width: 55%; }
         table.signature td.sig { width: 45%; text-align: center; vertical-align: top; }
-        .sig-titre { font-weight: bold; text-decoration: underline; }
-        .sig-image { height: 115px; margin: 4px 0; }
-        .sig-image img { max-height: 115px; max-width: 100%; }
-        .sig-nom { font-weight: bold; }
+        .sig-nom { font-weight: bold; margin: 0; }
+        .sig-titre { margin: 0; }
 
         .legal-footer { position: fixed; bottom: -50px; left: 0; right: 0; text-align: center; font-size: 9px; color: #666; border-top: 1px solid #ddd; padding-top: 8px; }
     </style>
@@ -101,13 +91,8 @@
         <tr>
             <td class="vide"></td>
             <td class="sig">
-                <div class="sig-titre"></div>
-                <div class="sig-image">
-                    @if(!empty($cachet))
-                        <img src="{{ $cachet }}" alt="Signature et cachet">
-                    @endif
-                </div>
-                <div class="sig-nom"></div>
+                <p class="sig-nom">Armelle ASSOGBA</p><br><br>
+                <p class="sig-titre">Directeur Général</p>
             </td>
         </tr>
     </table>

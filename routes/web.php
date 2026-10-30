@@ -143,7 +143,7 @@ Route::middleware([
         'sous-categories' => 'sousCategorie',
     ]);
 
-
+   
     /*
     |--------------------------------------------------------------------------
     | PARTENAIRES, ÉQUIPE & DOMAINES
