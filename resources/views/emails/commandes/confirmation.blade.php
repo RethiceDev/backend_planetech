@@ -88,6 +88,10 @@
             Email : {{ config('mail.from.address') }}
         </p>
 
+         <p style="margin-top: 22px;">
+            Votre bon de commande détaillé est joint à cet email.
+        </p>
+
     </div>
 
     <div class="footer">

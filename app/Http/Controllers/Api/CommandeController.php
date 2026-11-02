@@ -126,12 +126,14 @@ class CommandeController extends Controller
         | EMAIL CLIENT (confirmation de réception, sans prix)
         |--------------------------------------------------------------------------
         */
-        try {
-            Mail::to($commande->email)->send(new CommandeConfirmationMail($commande));
+        if ($pdfData !== null) {
+            try {
+                Mail::to($commande->email)->send(new CommandeConfirmationMail($commande, $pdfData));
 
-            Log::info('Email client envoyé avec succès à ' . $commande->email);
-        } catch (\Throwable $e) {
-            Log::error('Erreur envoi email client : ' . $e->getMessage());
+                Log::info('Email client avec PDF envoyé avec succès à ' . $commande->email);
+            } catch (\Throwable $e) {
+                Log::error('Erreur envoi email client : ' . $e->getMessage());
+            }
         }
 
         return response()->json([
