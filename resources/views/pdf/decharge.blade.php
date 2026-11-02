@@ -127,12 +127,16 @@
             relative à cette somme, dont je reconnais avoir pris possession intégralement.
         </p>
 
-    @elseif($decharge->type === 'materiel')
+   @elseif($decharge->type === 'materiel')
 
         <p class="texte">
-            Avoir reçu de la société <strong>PLANETECH SARL</strong>, ce jour,
+            Reçu de la part de <strong>{{ $decharge->fournisseur_nom ?? '........................' }}</strong>
+            @if(!empty($decharge->fournisseur_entreprise))
+                (représentant l'entreprise <strong>{{ $decharge->fournisseur_entreprise }}</strong>)
+            @endif
+            , ce jour, par la société <strong>{{ $decharge->entreprise }}</strong>,
             {{ $pluriel ? 'les matériels et/ou documents désignés' : 'le matériel ou document désigné' }}
-            ci-après, {{ $pluriel ? 'dans l\'état' : 'dans l\'état' }} indiqué pour chacun :
+            ci-après, dans l'état indiqué pour chacun :
         </p>
 
         <table class="list">
@@ -141,7 +145,7 @@
                     <th width="28">N°</th>
                     <th>Désignation</th>
                     <th width="40" style="text-align:center;">Qté</th>
-                    <th width="115">État à la remise</th>
+                    <th width="115">État à la réception</th>
                 </tr>
             </thead>
             <tbody>
@@ -157,17 +161,15 @@
         </table>
 
         <p class="texte">
-            Je reconnais {{ $pluriel ? 'les avoir reçus' : 'l\'avoir reçu' }} en l'état mentionné ci-dessus,
-            et m'engage à {{ $pluriel ? 'les' : 'le' }} conserver avec soin, à {{ $pluriel ? 'les' : 'l\'' }}utiliser
-            exclusivement dans le cadre de ma mission et à {{ $pluriel ? 'les' : 'le' }} restituer à
-            PLANETECH SARL, sur simple demande, en bon état, sous réserve de l'usure normale.
+            La société <strong>{{ $decharge->entreprise }}</strong> reconnaît {{ $pluriel ? 'les avoir reçus' : 'l\'avoir reçu' }} en l'état mentionné ci-dessus
+            et s'engage à {{ $pluriel ? 'les' : 'le' }} traiter selon les termes de la convention d'intervention ou de dépôt convenue.
         </p>
 
         <p class="texte">
-            En cas de perte, de vol ou de détérioration qui me serait imputable, j'en assumerai la responsabilité.
-            <strong>PLANETECH SARL est déchargée de toute obligation de remise</strong>
-            pour {{ $pluriel ? 'les éléments' : 'l\'élément' }} listé{{ $pluriel ? 's' : '' }} ci-dessus.
+            La présente décharge atteste de la réception effective par <strong>{{ $decharge->entreprise }}</strong>
+            {{ $pluriel ? 'des éléments listés' : 'de l\'élément listé' }} ci-dessus à la date mentionnée.
         </p>
+
 
     @elseif($decharge->type === 'responsabilite')
 
@@ -211,7 +213,7 @@
                 <div class="sign-nom">{{ $decharge->nom }}</div>
             </td>
             <td>
-                <div class="sign-titre">Pour PLANETECH SARL<br><span style="font-weight:normal; font-size:9.5px;">(cachet et signature)</span></div>
+                <div class="sign-titre">Pour {{ $decharge->fournisseur_entreprise }}<br><span style="font-weight:normal; font-size:9.5px;">(cachet et signature)</span></div>
                 <div class="sign-box"></div>
                 <div class="sign-nom">&nbsp;</div>
             </td>
