@@ -76,17 +76,25 @@
                                 <label class="block text-xs font-semibold text-slate-600 mb-1">Rôle / Poste du Procurant *</label>
                                 <input type="text" name="role_procurant" placeholder="ex: Stagiaire assistant comptable" required value="{{ old('role_procurant') }}" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm">
                             </div>
-                            <div>
+                           <div>
                                 <label class="block text-xs font-semibold text-slate-600 mb-1">Numéro CIP (10 chiffres) *</label>
-                                <input type="text" name="cip_procurant" maxlength="10" placeholder="ex: 2950708499" required value="{{ old('cip_procurant') }}" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm">
+                                <input type="text"
+                                    name="cip_procurant"
+                                    maxlength="10"
+                                    pattern="[0-9]{10}"
+                                    inputmode="numeric"
+                                    placeholder="ex: 2950708499"
+                                    required
+                                    value="{{ old('cip_procurant') }}"
+                                    class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm">
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 mb-1">Date d'expiration de la carte CIP *</label>
                                 <input type="date" name="expiration_cip" required value="{{ old('expiration_cip') }}" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm">
                             </div>
                             <div class="md:col-span-2">
-                                <label class="block text-xs font-semibold text-slate-600 mb-1">Adresse E-mail du Procurant *</label>
-                                <input type="email" name="email_procurant" required value="{{ old('email_procurant') }}" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm">
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Adresse E-mail du Procurant</label>
+                                <input type="email" name="email_procurant" placeholder="E-mail (facultatif)" value="{{ old('email_procurant') }}" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm">
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 mb-1">Valide du (Début) *</label>

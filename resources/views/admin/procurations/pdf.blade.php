@@ -1,68 +1,83 @@
-@php
-    if (empty($logo)) {
-        $candidats = glob(public_path('{,images/,img/,assets/,storage/}*logo*.{png,jpg,jpeg,PNG,JPG}'), GLOB_BRACE);
-        if (!empty($candidats)) {
-            $fichier = $candidats[0];
-            $ext = strtolower(pathinfo($fichier, PATHINFO_EXTENSION));
-            $mime = $ext === 'png' ? 'image/png' : 'image/jpeg';
-            $logo = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($fichier));
-        }
-    }
-@endphp
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <title>Procuration - {{ $procuration->reference }}</title>
     <style>
-        @page { margin: 30px 40px 80px 40px; }
-        body { font-family: DejaVu Sans, sans-serif; color: #111; font-size: 14px; line-height: 1.8; margin: 0; }
+        /* Marges strictes pour encadrer la zone d'impression entre l'en-tête et la signature physique */
+        @page {
+            size: A4 portrait;
+            margin-top: 45mm;    /* Réserve l'espace pour l'en-tête couleur pré-imprimé */
+            margin-bottom: 50mm; /* Réserve l'espace pour la zone basse (signature + nom/titre du DG) */
+            margin-left: 20mm;
+            margin-right: 20mm;
+        }
 
-        table.entete { width: 100%; border-collapse: collapse; border-bottom: 2px solid #1b4d3e; margin-bottom: 20px; }
-        table.entete td { vertical-align: middle; padding: 0 0 12px 0; }
-        td.logo-cell { width: 110px; padding-right: 15px; }
-        td.logo-cell img { width: 100px; height: auto; display: block; }
-        td.txt-cell { text-align: center; }
-        .nom { font-size: 22px; font-weight: bold; color: #1b4d3e; letter-spacing: 1px; margin-bottom: 4px; }
-        .lignes { font-size: 9px; line-height: 1.5; color: #444; }
+        body {
+            font-family: DejaVu Sans, sans-serif;
+            color: #111;
+            font-size: 13px;
+            line-height: 1.6;
+            margin: 0;
+        }
 
-        .title { text-align: center; font-size: 22px; font-weight: bold; text-decoration: underline; margin: 30px 0; letter-spacing: 0.5px; }
-        .content { text-align: justify; margin-bottom: 20px; }
-        .actions-list { margin: 15px 0 25px 20px; }
-        .actions-list li { margin-bottom: 6px; }
-        .footer-date { text-align: right; margin-top: 40px; font-style: italic; }
+        .title {
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+            text-decoration: underline;
+            margin: 0 0 20px 0;
+            letter-spacing: 0.5px;
+        }
 
-        table.signature { width: 100%; border-collapse: collapse; margin-top: 30px; page-break-inside: avoid; }
-        table.signature td.vide { width: 55%; }
-        table.signature td.sig { width: 45%; text-align: center; vertical-align: top; }
-        .sig-nom { font-weight: bold; margin: 0; }
-        .sig-titre { margin: 0; }
+        .content {
+            text-align: justify;
+            margin-bottom: 15px;
+        }
 
-        .legal-footer { position: fixed; bottom: -50px; left: 0; right: 0; text-align: center; font-size: 9px; color: #666; border-top: 1px solid #ddd; padding-top: 8px; }
+        .actions-list {
+            margin: 10px 0 20px 20px;
+        }
+
+        .actions-list li {
+            margin-bottom: 4px;
+        }
+
+        .footer-date {
+            text-align: right;
+            margin-top: 25px;
+            margin-bottom: 15px;
+            font-style: italic;
+        }
+
+        /* Bloc de signature positionné en bas pour imprimer le nom et le titre sous la signature du DG */
+        table.signature {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            page-break-inside: avoid;
+        }
+        table.signature td.vide {
+            width: 50%;
+        }
+        table.signature td.sig {
+            width: 50%;
+            text-align: center;
+            vertical-align: top;
+        }
+        .sig-nom {
+            font-weight: bold;
+            margin: 0;
+        }
+        .sig-titre {
+            margin: 0;
+            font-size: 12px;
+            color: #333;
+        }
     </style>
 </head>
 <body>
-
-    <table class="entete">
-        <tr>
-            <td class="logo-cell">
-                @if(!empty($logo))
-                    <img src="{{ $logo }}" alt="PLANETECH SARL">
-                @endif
-            </td>
-            <td class="txt-cell">
-                <div class="nom">PLANETECH SarL</div>
-                <div class="lignes">
-                    Tous Travaux de BTP - Conception - Etudes et de Réalisation d'Ouvrage d'Art<br>
-                    Vente et Négoce de Matériel Electrique - Plomberie - Réseau Informatique - Téléphone<br>
-                    Climatiseur - Fond Caméra de Surveillance - Alarme - Incendie et Intrusion<br>
-                    Expertise et Maîtrise d'Ouvrage - Commerce Général
-                </div>
-            </td>
-        </tr>
-    </table>
-
+    <br><br>
     <div class="title">PROCURATION</div>
 
     <div class="content">
@@ -87,20 +102,18 @@
         Fait à Cotonou, le {{ $procuration->created_at->format('d/m/Y') }}
     </div>
 
+    <!-- Le nom et le titre s'impriment juste sous la zone de signature manuscrite -->
     <table class="signature">
         <tr>
             <td class="vide"></td>
             <td class="sig">
-                <p class="sig-nom">Armelle ASSOGBA</p><br><br>
+                <!-- Espace vide virtuel de sécurité au-dessus du nom pour que la signature manuscrite du DG repose naturellement dedans -->
+                <div style="height: 25px;"></div><br><br><br>
+                <p class="sig-nom">Armelle ASSOGBA</p><br><br><br><br>
                 <p class="sig-titre">Directeur Général</p>
             </td>
         </tr>
     </table>
-
-    <div class="legal-footer">
-        04 BP : 0624 Cotonou . Compte Bancaire : 010002670139 Ora Bank . RCCM : RB/COT/13-B-9794 - IFU N° : 3201300290010<br>
-        Capital social : 1.000.000 FCFA - Tél : +229 01 64 54 99 59 / 0168 68 18 85 - Email : planetechsarlbenin@gmail.com
-    </div>
 
 </body>
 </html>

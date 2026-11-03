@@ -23,10 +23,10 @@ class ProcurationController extends Controller
     {
         $validated = $request->validate([
             'nom_procurant'    => 'required|string|max:255',
-            'cip_procurant'    => ['required', 'string', 'regex:/^\d{10}$/'], // Exactement 10 chiffres
+            'cip_procurant'    => ['required', 'string', 'max:10'], // Exactement 10 chiffres
             'expiration_cip'   => 'required|date',
             'role_procurant'   => 'required|string|max:255',
-            'email_procurant'  => 'required|email|max:255',
+            'email_procurant'  => '',
             'date_debut'       => 'required|date',
             'date_fin'         => 'required|date|after_or_equal:date_debut',
             'actions'          => 'required|array|min:1',

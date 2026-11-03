@@ -332,7 +332,7 @@
                                     </label>
 
                                     <input
-                                        type="text"
+                                        type="number"
                                         id="numero"
                                         name="numero"
                                         value="{{ old('numero') }}"
