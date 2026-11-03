@@ -741,161 +741,160 @@
 
                 <aside class="lg:col-span-5 min-w-0 bg-white rounded-2xl border border-gray-100 p-5 lg:p-6 shadow-sm space-y-4 decharge-card">
 
-                    <div class="flex items-center justify-between gap-3 border-b border-gray-100 pb-4">
+    {{-- EN-TÊTE --}}
+    <div class="flex items-center justify-between gap-3 border-b border-gray-100 pb-4">
+        <div class="flex items-center gap-3 min-w-0">
+            <div class="w-10 h-10 shrink-0 rounded-xl bg-emerald-50 flex items-center justify-center">
+                <i data-lucide="history" class="w-5 h-5 text-forest-700"></i>
+            </div>
+            <div class="min-w-0">
+                <h2 class="text-lg font-semibold text-slate-900">Historique récent</h2>
+                <p class="text-xs text-slate-500 mt-0.5">Consultez, imprimez ou téléchargez les décharges.</p>
+            </div>
+        </div>
 
-                        <div>
-                            <h2 class="text-lg font-semibold text-slate-900">
-                                Historique récent
-                            </h2>
+        <span class="shrink-0 inline-flex items-center rounded-full bg-forest-50 text-forest-700 text-xs font-bold px-3 py-1">
+            {{ $decharges->total() }}
+        </span>
+    </div>
 
-                            <p class="text-xs text-slate-500 mt-1">
-                                Consultez les décharges enregistrées.
-                            </p>
-                        </div>
+    <div class="space-y-3">
 
-                        <div class="w-10 h-10 shrink-0 rounded-xl bg-emerald-50 flex items-center justify-center">
-                            <i data-lucide="history" class="w-5 h-5 text-forest-700"></i>
-                        </div>
+        @forelse($decharges as $d)
 
-                    </div>
+            @php
+                $typeInfo = match($d->type) {
+                    'argent' => [
+                        'label' => 'Argent',
+                        'icon'  => 'banknote',
+                        'bar'   => 'border-l-amber-400',
+                        'badge' => 'bg-amber-50 text-amber-700',
+                    ],
+                    'materiel' => [
+                        'label' => 'Matériel / Document',
+                        'icon'  => 'package',
+                        'bar'   => 'border-l-blue-400',
+                        'badge' => 'bg-blue-50 text-blue-700',
+                    ],
+                    'responsabilite' => [
+                        'label' => 'Responsabilité',
+                        'icon'  => 'shield-check',
+                        'bar'   => 'border-l-violet-400',
+                        'badge' => 'bg-violet-50 text-violet-700',
+                    ],
+                    default => [
+                        'label' => ucfirst((string) $d->type),
+                        'icon'  => 'file-text',
+                        'bar'   => 'border-l-slate-300',
+                        'badge' => 'bg-slate-100 text-slate-600',
+                    ],
+                };
+            @endphp
 
-                    <div class="space-y-3">
+            <article class="historique-card group p-4 rounded-xl border border-slate-100 border-l-4 {{ $typeInfo['bar'] }} bg-white space-y-3 shadow-sm transition hover:shadow-md hover:-translate-y-0.5">
 
-                        @forelse($decharges as $d)
+                {{-- RÉFÉRENCE ET DATE --}}
+                <div class="flex flex-wrap justify-between items-center gap-2">
+                    <span class="font-bold text-xs text-forest-700 bg-emerald-100 px-2.5 py-1 rounded-md">
+                        {{ $d->reference }}
+                    </span>
 
-                            <article class="historique-card p-4 rounded-xl border border-slate-100 bg-slate-50/70 space-y-3">
+                    <span class="inline-flex items-center gap-1 text-xs text-slate-400">
+                        <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+                        {{ $d->created_at->format('d/m/Y') }}
+                    </span>
+                </div>
 
-                                {{-- RÉFÉRENCE ET DATE --}}
+                {{-- BÉNÉFICIAIRE ET TYPE --}}
+                <div class="flex items-start justify-between gap-3">
+                    <p class="text-sm font-semibold text-slate-800 min-w-0 break-words">
+                        {{ $d->nom }}
+                    </p>
 
-                                <div class="flex flex-wrap justify-between items-center gap-2">
+                    <span class="shrink-0 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold {{ $typeInfo['badge'] }}">
+                        <i data-lucide="{{ $typeInfo['icon'] }}" class="w-3.5 h-3.5"></i>
+                        {{ $typeInfo['label'] }}
+                    </span>
+                </div>
 
-                                    <span class="font-bold text-xs text-forest-700 bg-emerald-100 px-2.5 py-1 rounded-md">
-                                        {{ $d->reference }}
-                                    </span>
-
-                                    <span class="text-xs text-slate-400">
-                                        {{ $d->created_at->format('d/m/Y') }}
-                                    </span>
-
-                                </div>
-
-                                {{-- BÉNÉFICIAIRE --}}
-
-                                <div class="space-y-1">
-
-                                    <p class="text-sm font-semibold text-slate-800">
-                                        {{ $d->nom }}
-                                    </p>
-
-                                    <p class="text-xs text-slate-500">
-                                        Type :
-                                        <span class="font-medium capitalize">
-                                            @switch($d->type)
-                                                @case('argent')
-                                                    Argent
-                                                    @break
-
-                                                @case('materiel')
-                                                    Matériel / Document
-                                                    @break
-
-                                                @case('responsabilite')
-                                                    Responsabilité
-                                                    @break
-
-                                                @default
-                                                    {{ $d->type }}
-                                            @endswitch
-                                        </span>
-                                    </p>
-
-                                </div>
-
-                                {{-- DÉTAILS DES MATÉRIELS --}}
-
-                                @if($d->type === 'materiel' && $d->items && $d->items->count() > 0)
-
-                                    <div class="text-xs bg-white p-3 rounded-lg border border-slate-200 text-slate-600 space-y-2">
-
-                                        @foreach($d->items as $item)
-
-                                            <div class="flex items-start gap-2">
-
-                                                <span class="text-emerald-600 font-bold">•</span>
-
-                                                <span class="min-w-0">
-                                                    {{ $item->designation }}
-                                                    <span class="text-slate-400">
-                                                        (Qté : {{ $item->quantite }})
-                                                    </span>
-                                                </span>
-
-                                            </div>
-
-                                        @endforeach
-
-                                    </div>
-
-                                @endif
-
-                                {{-- ACTIONS PDF --}}
-
-                                <div class="historique-actions flex items-center gap-2 pt-1">
-
-                                    <a
-                                        href="{{ route('admin.decharges.pdf', $d) }}"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        class="flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-forest-700 hover:bg-forest-900 text-white text-xs font-semibold rounded-lg transition-all"
-                                    >
-                                        <i data-lucide="file-text" class="w-4 h-4 shrink-0"></i>
-                                        <span>Voir le PDF</span>
-                                    </a>
-
-                                    <a
-                                        href="{{ route('admin.decharges.pdf', ['decharge' => $d, 'download' => 1]) }}"
-                                        class="shrink-0 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-semibold rounded-lg transition-all"
-                                        title="Télécharger le PDF"
-                                        aria-label="Télécharger le PDF de la décharge {{ $d->reference }}"
-                                    >
-                                        <i data-lucide="download" class="w-4 h-4"></i>
-                                    </a>
-
-                                </div>
-
-                            </article>
-
-                        @empty
-
-                            <div class="flex flex-col items-center justify-center text-center py-10 px-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/50">
-
-                                <div class="w-12 h-12 rounded-full bg-white border border-slate-100 flex items-center justify-center mb-3">
-                                    <i data-lucide="file-text" class="w-6 h-6 text-slate-400"></i>
-                                </div>
-
-                                <p class="text-sm font-medium text-slate-600">
-                                    Aucune décharge enregistrée
-                                </p>
-
-                                <p class="text-xs text-slate-400 mt-1">
-                                    Les nouvelles décharges apparaîtront ici.
-                                </p>
-
+                {{-- DÉTAILS DES MATÉRIELS --}}
+                @if($d->type === 'materiel' && $d->items && $d->items->count() > 0)
+                    <div class="text-xs bg-slate-50 p-3 rounded-lg border border-slate-100 text-slate-600 space-y-2">
+                        @foreach($d->items as $item)
+                            <div class="flex items-start gap-2">
+                                <span class="text-emerald-600 font-bold">•</span>
+                                <span class="min-w-0">
+                                    {{ $item->designation }}
+                                    <span class="text-slate-400">(Qté : {{ $item->quantite }})</span>
+                                </span>
                             </div>
-
-                        @endforelse
-
+                        @endforeach
                     </div>
+                @endif
 
-                    {{-- PAGINATION --}}
+                {{-- ACTIONS --}}
+                <div class="historique-actions flex items-center gap-2 pt-1">
 
-                    @if($decharges->hasPages())
-                        <div class="pt-3 border-t border-gray-100 overflow-x-auto">
-                            {{ $decharges->links() }}
-                        </div>
-                    @endif
+                    {{-- VOIR --}}
+                    <a
+                        href="{{ route('admin.decharges.pdf', $d) }}"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-forest-700 hover:bg-forest-900 text-white text-xs font-semibold rounded-lg transition-all"
+                    >
+                        <i data-lucide="eye" class="w-4 h-4 shrink-0"></i>
+                        <span>Voir</span>
+                    </a>
 
-                </aside>
+                    {{-- IMPRIMER (lance l'impression automatiquement) --}}
+                    <button
+                        type="button"
+                        data-print-url="{{ route('admin.decharges.pdf', $d) }}"
+                        class="btn-print flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-white hover:bg-emerald-50 text-forest-700 border border-forest-700/30 text-xs font-semibold rounded-lg transition-all disabled:opacity-60 disabled:cursor-wait"
+                        title="Imprimer la décharge {{ $d->reference }}"
+                        aria-label="Imprimer la décharge {{ $d->reference }}"
+                    >
+                        <i data-lucide="printer" class="w-4 h-4 shrink-0 print-icon"></i>
+                        <span class="print-spinner hidden w-4 h-4 shrink-0 rounded-full border-2 border-forest-700 border-t-transparent animate-spin"></span>
+                        <span class="print-label">Imprimer</span>
+                    </button>
+
+                    {{-- TÉLÉCHARGER --}}
+                    <a
+                        href="{{ route('admin.decharges.pdf', ['decharge' => $d, 'download' => 1]) }}"
+                        class="shrink-0 inline-flex items-center justify-center px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-semibold rounded-lg transition-all"
+                        title="Télécharger le PDF"
+                        aria-label="Télécharger le PDF de la décharge {{ $d->reference }}"
+                    >
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                    </a>
+
+                </div>
+
+            </article>
+
+        @empty
+
+            <div class="flex flex-col items-center justify-center text-center py-10 px-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/50">
+                <div class="w-12 h-12 rounded-full bg-white border border-slate-100 flex items-center justify-center mb-3">
+                    <i data-lucide="file-text" class="w-6 h-6 text-slate-400"></i>
+                </div>
+                <p class="text-sm font-medium text-slate-600">Aucune décharge enregistrée</p>
+                <p class="text-xs text-slate-400 mt-1">Les nouvelles décharges apparaîtront ici.</p>
+            </div>
+
+        @endforelse
+
+    </div>
+
+    {{-- PAGINATION --}}
+    @if($decharges->hasPages())
+        <div class="pt-3 border-t border-gray-100 overflow-x-auto">
+            {{ $decharges->links() }}
+        </div>
+    @endif
+
+</aside>
 
             </div>
 
@@ -904,6 +903,81 @@
     </div>
 
 </div>
+
+
+<script>
+(function () {
+    let frame = null;
+
+    function setLoading(btn, loading) {
+        btn.disabled = loading;
+        btn.querySelector('.print-icon')?.classList.toggle('hidden', loading);
+        btn.querySelector('.print-spinner')?.classList.toggle('hidden', !loading);
+        const label = btn.querySelector('.print-label');
+        if (label) label.textContent = loading ? 'Préparation…' : 'Imprimer';
+    }
+
+    function nettoyer() {
+        if (frame) {
+            URL.revokeObjectURL(frame.dataset.blob);
+            frame.remove();
+            frame = null;
+        }
+    }
+
+    async function imprimer(btn) {
+        const url = btn.dataset.printUrl;
+        setLoading(btn, true);
+
+        try {
+            const res = await fetch(url, {
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/pdf' }
+            });
+
+            const type = res.headers.get('Content-Type') || '';
+            if (!res.ok || !type.includes('pdf')) {
+                throw new Error('Réponse invalide');
+            }
+
+            const blobUrl = URL.createObjectURL(await res.blob());
+
+            nettoyer();
+            frame = document.createElement('iframe');
+            frame.setAttribute('aria-hidden', 'true');
+            frame.style.cssText =
+                'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none;';
+            frame.dataset.blob = blobUrl;
+
+            frame.onload = function () {
+                setTimeout(function () {
+                    try {
+                        frame.contentWindow.focus();
+                        frame.contentWindow.print();
+                    } catch (e) {
+                        window.open(blobUrl, '_blank');
+                    }
+                    setLoading(btn, false);
+                }, 400);
+            };
+
+            frame.src = blobUrl;
+            document.body.appendChild(frame);
+        } catch (e) {
+            // Session expirée ou erreur : on ouvre le PDF normalement
+            setLoading(btn, false);
+            window.open(url, '_blank');
+        }
+    }
+
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('[data-print-url]');
+        if (!btn) return;
+        e.preventDefault();
+        imprimer(btn);
+    });
+})();
+</script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
