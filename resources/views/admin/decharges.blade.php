@@ -192,7 +192,7 @@
                         method="POST"
                         id="decharge-form"
                         class="space-y-5"
-                    >
+                     >
                         @csrf
 
                         {{-- TYPE DE DÉCHARGE --}}
@@ -240,7 +240,7 @@
 
                                     <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
                                         <i data-lucide="box" class="w-4 h-4 text-emerald-600 shrink-0"></i>
-                                        Matériel / Doc
+                                        Matériel / Doc 
                                     </span>
 
                                 </label>
@@ -542,116 +542,113 @@
 
                                     {{-- PREMIÈRE LIGNE --}}
 
-                                    <div class="materiel-row p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+                                    <!-- Ligne de matériel unifiée (12 colonnes) -->
+                                   <!-- Ligne de matériel unifiée (12 colonnes équilibrées) -->
+<div class="materiel-row p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end mb-4">
 
-                                        <div class="min-w-0 lg:col-span-4">
-                                            <label for="materiel-designation-0" class="block text-xs font-semibold text-slate-600 mb-1.5">
-                                                Désignation *
-                                            </label>
+    <!-- Désignation (3 colonnes) -->
+    <div class="min-w-0 lg:col-span-3">
+        <label for="materiel-designation-0" class="block text-xs font-semibold text-slate-600 mb-1.5">
+            Désignation *
+        </label>
+        <input
+            type="text"
+            id="materiel-designation-0"
+            name="materiels[0][designation]"
+            value="{{ old('materiels.0.designation') }}"
+            placeholder="Ex. : Routeur, ordinateur"
+            required
+            maxlength="255"
+            class="w-full min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm"
+        >
+    </div>
 
-                                            <input
-                                                type="text"
-                                                id="materiel-designation-0"
-                                                name="materiels[0][designation]"
-                                                value="{{ old('materiels.0.designation') }}"
-                                                placeholder="Ex. : Routeur, ordinateur"
-                                                required
-                                                maxlength="255"
-                                                class="w-full min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm"
-                                            >
-                                        </div>
+    <!-- Quantité (2 colonnes - élargi) -->
+    <div class="min-w-0 lg:col-span-2">
+        <label for="materiel-quantite-0" class="block text-xs font-semibold text-slate-600 mb-1.5">
+            Quantité
+        </label>
+        <input
+            type="number"
+            id="materiel-quantite-0"
+            name="materiels[0][quantite]"
+            value="{{ old('materiels.0.quantite', 1) }}"
+            min="1"
+            step="1"
+            placeholder="Qté"
+            class="w-full min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm quantite"
+        >
+    </div>
 
-                                        <!-- Quantité -->
-                                        <div class="min-w-0 lg:col-span-1">
-                                            <label for="materiel-quantite-0" class="block text-xs font-semibold text-slate-600 mb-1.5">
-                                                Quantité
-                                            </label>
+    <!-- Prix unitaire (2 colonnes) -->
+    <div class="min-w-0 lg:col-span-2">
+        <label for="materiel-prix-unitaire-0" class="block text-xs font-semibold text-slate-600 mb-1.5">
+            Prix unitaire
+        </label>
+        <input
+            type="number"
+            id="materiel-prix-unitaire-0"
+            name="materiels[0][prix_unitaire]"
+            value="{{ old('materiels.0.prix_unitaire') }}"
+            min="0"
+            step="0.01"
+            placeholder="FCFA"
+            class="w-full min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm prix-unitaire"
+        >
+    </div>
 
-                                            <input
-                                                type="number"
-                                                id="materiel-quantite-0"
-                                                name="materiels[0][quantite]"
-                                                value="{{ old('materiels.0.quantite', 1) }}"
-                                                min="1"
-                                                step="1"
-                                                placeholder="Qté"
-                                                class="w-full min-w-[90px] px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm"
-                                            >
-                                        </div>
+    <!-- Prix global - Calculé automatiquement (2 colonnes) -->
+    <div class="min-w-0 lg:col-span-2">
+        <label for="materiel-prix-global-0" class="block text-xs font-semibold text-slate-600 mb-1.5">
+            Prix global
+        </label>
+        <input
+            type="number"
+            id="materiel-prix-global-0"
+            name="materiels[0][prix_global]"
+            value="{{ old('materiels.0.prix_global') }}"
+            min="0"
+            step="0.01"
+            placeholder="FCFA"
+            class="w-full min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm prix-global"
+            readonly
+        >
+    </div>
 
-                                        <!-- Prix unitaire avec un espace ajouté -->
-                                        <div class="min-w-0 lg:col-span-2 lg:pl-3">
-                                            <label for="materiel-prix-unitaire-0" class="block text-xs font-semibold text-slate-600 mb-1.5">
-                                                Prix unitaire
-                                            </label>
+    <!-- État (3 colonnes) -->
+    <div class="min-w-0 lg:col-span-3">
+        <label for="materiel-etat-0" class="block text-xs font-semibold text-slate-600 mb-1.5">
+            État *
+        </label>
+        <select
+            id="materiel-etat-0"
+            name="materiels[0][etat]"
+            required
+            class="w-full min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm"
+        >
+            <option value="neuf" {{ old('materiels.0.etat', 'neuf') === 'neuf' ? 'selected' : '' }}>
+                Neuf
+            </option>
+            <option value="partiellement_utilise" {{ old('materiels.0.etat') === 'partiellement_utilise' ? 'selected' : '' }}>
+                Partiellement utilisé
+            </option>
+            <option value="vieux" {{ old('materiels.0.etat') === 'vieux' ? 'selected' : '' }}>
+                Vieux
+            </option>
+            <option value="defectueux" {{ old('materiels.0.etat') === 'defectueux' ? 'selected' : '' }}>
+                Défectueux
+            </option>
+        </select>
+    </div>
 
-                                            <input
-                                                type="number"
-                                                id="materiel-prix-unitaire-0"
-                                                name="materiels[0][prix_unitaire]"
-                                                value="{{ old('materiels.0.prix_unitaire') }}"
-                                                min="0"
-                                                step="0.01"
-                                                placeholder="FCFA"
-                                                class="w-full min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm prix-unitaire"
-                                            >
-                                        </div>
-
-                                        <div class="min-w-0 lg:col-span-2">
-                                            <label for="materiel-prix-global-0" class="block text-xs font-semibold text-slate-600 mb-1.5">
-                                                Prix global
-                                            </label>
-
-                                            <input
-                                                type="number"
-                                                id="materiel-prix-global-0"
-                                                name="materiels[0][prix_global]"
-                                                value="{{ old('materiels.0.prix_global') }}"
-                                                min="0"
-                                                step="0.01"
-                                                placeholder="FCFA"
-                                                class="w-full min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm prix-global"
-                                            >
-                                        </div>
-
-                                        <div class="min-w-0 lg:col-span-2">
-                                            <label for="materiel-etat-0" class="block text-xs font-semibold text-slate-600 mb-1.5">
-                                                État *
-                                            </label>
-
-                                            <select
-                                                id="materiel-etat-0"
-                                                name="materiels[0][etat]"
-                                                required
-                                                class="w-full min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm"
-                                            >
-                                                <option value="neuf" {{ old('materiels.0.etat', 'neuf') === 'neuf' ? 'selected' : '' }}>
-                                                    Neuf
-                                                </option>
-
-                                                <option value="partiellement_utilise" {{ old('materiels.0.etat') === 'partiellement_utilise' ? 'selected' : '' }}>
-                                                    Partiellement utilisé
-                                                </option>
-
-                                                <option value="vieux" {{ old('materiels.0.etat') === 'vieux' ? 'selected' : '' }}>
-                                                    Vieux
-                                                </option>
-
-                                                <option value="defectueux" {{ old('materiels.0.etat') === 'defectueux' ? 'selected' : '' }}>
-                                                    Défectueux
-                                                </option>
-                                            </select>
-                                        </div>
-
-                                        <div class="hidden lg:block lg:col-span-1"></div>
-
-                                    </div>
-
+</div>
                                 </div>
 
                             </div>
 
                         </div>
+
+
 
                         {{-- SECTION RESPONSABILITÉ --}}
 
@@ -1286,6 +1283,31 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+});
+
+
+
+document.addEventListener('input', function (e) {
+    // Vérifie si l'élément modifié fait partie de la quantité ou du prix unitaire
+    if (e.target.classList.contains('quantite') || e.target.classList.contains('prix-unitaire')) {
+        // Trouve la ligne parente (conteneur de la ligne de matériel)
+        const row = e.target.closest('.materiel-row');
+        if (!row) return;
+
+        const inputQuantite = row.querySelector('.quantite');
+        const inputPrixUnitaire = row.querySelector('.prix-unitaire');
+        const inputPrixGlobal = row.querySelector('.prix-global');
+
+        // Récupère les valeurs numériques
+        const quantite = parseFloat(inputQuantite.value) || 0;
+        const prixUnitaire = parseFloat(inputPrixUnitaire.value) || 0;
+
+        // Calcule le total
+        const prixGlobal = quantite * prixUnitaire;
+
+        // Affiche le résultat arrondi à 2 chiffres après la virgule
+        inputPrixGlobal.value = prixGlobal > 0 ? prixGlobal.toFixed(2) : '';
+    }
 });
 </script>
 

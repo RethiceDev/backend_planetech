@@ -95,7 +95,7 @@
             @php $a = request()->routeIs('admin.commandes', 'commande.*'); @endphp
             <a href="{{ route('admin.commandes') }}" class="{{ $classe($a) }}" {!! $current($a) !!}>
                 <i data-lucide="shopping-cart" class="w-5 h-5"></i>
-                <span>Bons de commande</span>
+                <span>Commande</span>
             </a>
 
 

@@ -254,6 +254,7 @@
 
                                 $nombreArticles = $commande->items->sum('quantite');
                                 $devisEnvoye = $commande->total !== null;
+                                $proformaDispo = $commandesData[$commande->id]['proforma_disponible'] ?? false;
                             @endphp
 
                             <tr class="transition hover:bg-gray-50">
@@ -325,15 +326,32 @@
                                 </td>
 
                                 <td class="px-6 py-4 text-right">
-                                    <button
-                                        type="button"
-                                        onclick="ouvrirCommande({{ $commande->id }})"
-                                        class="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-800"
-                                    >
-                                        <i data-lucide="eye" class="h-4 w-4"></i>
-                                        {{ $devisEnvoye ? 'Voir' : 'Chiffrer' }}
-                                    </button>
-                                </td>
+    <div class="inline-flex items-center gap-2">
+
+        @if($proformaDispo)
+            <a
+                href="{{ route('commande.proforma', $commande) }}"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Voir la proforma"
+                class="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100"
+            >
+                <i data-lucide="file-text" class="h-4 w-4"></i>
+                Proforma
+            </a>
+        @endif
+
+        <button
+            type="button"
+            onclick="ouvrirCommande({{ $commande->id }})"
+            class="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-800"
+        >
+            <i data-lucide="eye" class="h-4 w-4"></i>
+            {{ $devisEnvoye ? 'Voir' : 'Chiffrer' }}
+        </button>
+
+    </div>
+</td>
 
                             </tr>
 
@@ -591,10 +609,35 @@
                             type="button"
                             onclick="fermerCommande()"
                             class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-xs font-semibold text-gray-600 shadow-sm transition hover:bg-gray-50"
-                        >
+                         >
                             <i data-lucide="x" class="h-4 w-4"></i>
                             Fermer
                         </button>
+
+
+
+                        <a
+                            id="btnVoirProforma"
+                            href="#"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="hidden items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-2.5 text-xs font-semibold text-emerald-800 shadow-sm transition hover:bg-emerald-100"
+                            >
+                            <i data-lucide="eye" class="h-4 w-4"></i>
+                            Voir la proforma
+                        </a>
+
+                        <button
+                            id="btnImprimerProforma"
+                            type="button"
+                            data-print-url="#"
+                            class="btn-print hidden items-center justify-center gap-2 rounded-xl border border-forest-700/30 bg-white px-5 py-2.5 text-xs font-semibold text-forest-700 shadow-sm transition hover:bg-emerald-50 disabled:opacity-60"
+                         >
+                            <i data-lucide="printer" class="h-4 w-4 print-icon"></i>
+                            <span class="print-spinner hidden h-4 w-4 animate-spin rounded-full border-2 border-forest-700 border-t-transparent"></span>
+                            <span class="print-label">Imprimer</span>
+                        </button>
+
 
                         <button
                             id="btnEnvoyerDevis"
@@ -603,7 +646,7 @@
                             class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-6 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             <i data-lucide="send" class="h-4 w-4"></i>
-                            Envoyer le devis au client
+                            Envoyer la Proforma
                         </button>
 
                     </div>
@@ -625,6 +668,9 @@
 
 
 <script>
+
+
+
 
     let commandeActuelleId = null;
 
@@ -701,6 +747,8 @@
 
     /* OUVRIR COMMANDE */
     function ouvrirCommande(id) {
+
+
         const commande = window.commandesData[id];
 
         if (!commande) {
@@ -806,7 +854,21 @@
                 el.addEventListener('change', recalculer);
             });
         }
+        /* BOUTONS PROFORMA */
+const proformaDispo = commande.proforma_disponible === true;
+const btnVoir = document.getElementById('btnVoirProforma');
+const btnImprimer = document.getElementById('btnImprimerProforma');
+const btnEnvoyer = document.getElementById('btnEnvoyerDevis');
 
+btnVoir.href = commande.proforma_url || '#';
+btnVoir.classList.toggle('hidden', !proformaDispo);
+
+btnImprimer.dataset.printUrl = (commande.proforma_url || '#') + '?t=' + Date.now();
+btnImprimer.classList.toggle('hidden', !proformaDispo);
+
+// Libellé du bouton d'envoi selon que le devis a déjà été envoyé ou non
+const dejaEnvoye = commande.total !== null && commande.total !== undefined;
+btnEnvoyer.lastChild.textContent = dejaEnvoye ? ' Renvoyer la Proforma' : ' Envoyer la Proforma';
         recalculer();
 
         modal.classList.remove('hidden');
@@ -975,6 +1037,61 @@
             notification.remove();
         }, 5000);
     }
+
+    /* IMPRIMER LA PROFORMA */
+function imprimerProforma(bouton) {
+    const url = bouton.dataset.printUrl;
+
+    if (!url || url === '#') {
+        return;
+    }
+
+    const icone = bouton.querySelector('.print-icon');
+    const spinner = bouton.querySelector('.print-spinner');
+    const label = bouton.querySelector('.print-label');
+
+    const finir = function () {
+        bouton.disabled = false;
+        icone.classList.remove('hidden');
+        spinner.classList.add('hidden');
+        label.textContent = 'Imprimer';
+    };
+
+    bouton.disabled = true;
+    icone.classList.add('hidden');
+    spinner.classList.remove('hidden');
+    label.textContent = 'Préparation...';
+
+    // iframe invisible qui charge le PDF puis lance l'impression
+    document.getElementById('iframeImpression')?.remove();
+
+    const iframe = document.createElement('iframe');
+    iframe.id = 'iframeImpression';
+    iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+    iframe.src = url;
+
+    iframe.onload = function () {
+        try {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+        } catch (e) {
+            // Repli : ouvrir le PDF dans un nouvel onglet
+            window.open(url, '_blank');
+        }
+        finir();
+    };
+
+    iframe.onerror = function () {
+        finir();
+        afficherNotification('Impossible de charger la proforma.', 'error');
+    };
+
+    document.body.appendChild(iframe);
+}
+
+document.getElementById('btnImprimerProforma').addEventListener('click', function () {
+    imprimerProforma(this);
+});
 
     /* ESC */
     document.addEventListener('keydown', function (event) {

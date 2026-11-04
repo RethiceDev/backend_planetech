@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 
 class CommandeController extends Controller
 {
@@ -76,6 +77,11 @@ class CommandeController extends Controller
                 'telephone' => $commande->telephone,
                 'total' => $commande->total !== null ? (float) $commande->total : null,
                 'statut' => $commande->statut,
+
+                // true si la proforma PDF a déjà été générée et enregistrée
+                'proforma_disponible' => Storage::disk('local')->exists($this->cheminProforma($commande)),
+                'proforma_url' => route('commande.proforma', $commande),
+
                 'items' => $commande->items
                     ->map(function ($item) {
                         return [
@@ -113,7 +119,7 @@ class CommandeController extends Controller
     /**
      * Enregistre la disponibilité et les prix de chaque article,
      * calcule le total, puis envoie le devis au client par email
-     * avec la proforma en PDF.
+     * avec la proforma en PDF (qui est aussi conservée sur le serveur).
      */
     public function envoyerDevis(Request $request, Commande $commande)
     {
@@ -207,17 +213,12 @@ class CommandeController extends Controller
         $commande->refresh();
         $commande->load('items');
 
-        if (empty($commande->email)) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Devis enregistré, mais ce client n\'a pas d\'adresse email.',
-            ]);
-        }
-
         /*
         |--------------------------------------------------------------------------
         | GÉNÉRATION DU PDF DE PROFORMA
         |--------------------------------------------------------------------------
+        | Le PDF est généré même si le client n'a pas d'email : l'admin peut
+        | ainsi toujours le consulter, l'imprimer ou le transmettre autrement.
         | Si la génération échoue, le devis part quand même par email (sans PDF)
         | et l'admin en est informé dans le message de retour.
         */
@@ -246,6 +247,27 @@ class CommandeController extends Controller
             Log::error('Erreur génération PDF proforma : ' . $e->getMessage());
         }
 
+        // Conserver la proforma pour pouvoir la revoir ou l'imprimer plus tard.
+        $proformaEnregistree = false;
+
+        if ($pdfData !== null) {
+            try {
+                Storage::disk('local')->put($this->cheminProforma($commande), $pdfData);
+                $proformaEnregistree = true;
+            } catch (\Throwable $e) {
+                Log::error('Erreur enregistrement proforma : ' . $e->getMessage());
+            }
+        }
+
+        if (empty($commande->email)) {
+            return response()->json([
+                'success' => true,
+                'proforma_disponible' => $proformaEnregistree,
+                'proforma_url' => route('commande.proforma', $commande),
+                'message' => 'Devis enregistré, mais ce client n\'a pas d\'adresse email.',
+            ]);
+        }
+
         try {
             Mail::to($commande->email)->send(new CommandeDisponibiliteMail($commande, $pdfData));
         } catch (\Throwable $e) {
@@ -253,16 +275,51 @@ class CommandeController extends Controller
 
             return response()->json([
                 'success' => false,
+                'proforma_disponible' => $proformaEnregistree,
+                'proforma_url' => route('commande.proforma', $commande),
                 'message' => 'Devis enregistré, mais l\'email n\'a pas pu être envoyé au client. Réessayez.',
             ], 500);
         }
 
         return response()->json([
             'success' => true,
+            'proforma_disponible' => $proformaEnregistree,
+            'proforma_url' => route('commande.proforma', $commande),
             'message' => $pdfData !== null
                 ? 'Le devis a été enregistré et envoyé au client avec la proforma en PDF.'
                 : 'Le devis a été envoyé au client, mais le PDF de la proforma n\'a pas pu être généré (voir les logs).',
         ]);
+    }
+
+    /**
+     * Affiche (ou télécharge avec ?download=1) la proforma déjà envoyée.
+     */
+    public function voirProforma(Request $request, Commande $commande)
+    {
+        $chemin = $this->cheminProforma($commande);
+
+        if (!Storage::disk('local')->exists($chemin)) {
+            abort(404, 'Aucune proforma enregistrée pour cette commande.');
+        }
+
+        $nom = 'Proforma-' . $commande->reference . '.pdf';
+        $mode = $request->boolean('download') ? 'attachment' : 'inline';
+
+        return response(Storage::disk('local')->get($chemin), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => $mode . '; filename="' . $nom . '"',
+            'Cache-Control' => 'private, no-store',
+        ]);
+    }
+
+    /**
+     * Chemin de la proforma sur le disque (nom de fichier nettoyé).
+     */
+    private function cheminProforma(Commande $commande): string
+    {
+        $nom = preg_replace('/[^A-Za-z0-9_-]/', '-', (string) $commande->reference);
+
+        return 'proformas/' . $nom . '.pdf';
     }
 
     /**

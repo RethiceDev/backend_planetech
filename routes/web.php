@@ -23,6 +23,11 @@ use App\Http\Controllers\Admin\ProcurationController;
 |--------------------------------------------------------------------------
 */
 
+
+Route::get('/commande/{commande}/proforma', [CommandeController::class, 'voirProforma'])
+    ->name('commande.proforma');
+
+    
 // Page de connexion
 Route::get('/Administateur', [AdminAuthController::class, 'showLogin'])
     ->name('admin.login');
@@ -143,7 +148,7 @@ Route::middleware([
         'sous-categories' => 'sousCategorie',
     ]);
 
-   
+
     /*
     |--------------------------------------------------------------------------
     | PARTENAIRES, ÉQUIPE & DOMAINES
