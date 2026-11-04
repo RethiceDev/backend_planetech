@@ -47,7 +47,7 @@
                 </div>
 
                 <div>
-                    <h1 class="mt-1 text-2xl font-bold text-slate-900">Les Bons de Commandes tttttt</h1>
+                    <h1 class="mt-1 text-2xl font-bold text-slate-900">Les Bons de Commandes</h1>
                     <p class="mt-1 text-sm text-slate-500">
                         Vérifiez la disponibilité, renseignez les prix et envoyez le devis au client.
                     </p>
