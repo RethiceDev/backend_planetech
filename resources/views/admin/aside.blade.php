@@ -178,6 +178,37 @@
                 </span>
             </div>
 
+           {{-- ===== ESPACE ENTRETIEN EMBAUCHE ===== --}}
+             <p class="px-4 pt-4 pb-1 text-[11px] font-semibold uppercase tracking-wider text-emerald-300/50">
+                Espace Recrutements
+            </p>
+
+            <div
+                class="flex items-center gap-3 px-4 py-3 rounded-2xl font-medium text-sm
+                    text-emerald-100/40 cursor-not-allowed select-none"
+                aria-disabled="true"
+                title="Bientôt disponible"
+                >
+                <i data-lucide="users" class="w-5 h-5"></i>
+                <span>Entretiens du Jour</span>
+                <span class="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                    Bientôt
+                </span>
+            </div>
+
+            <div
+                class="flex items-center gap-3 px-4 py-3 rounded-2xl font-medium text-sm
+                    text-emerald-100/40 cursor-not-allowed select-none"
+                aria-disabled="true"
+                title="Bientôt disponible"
+                >
+                <i data-lucide="calendar-check" class="w-5 h-5"></i>
+                <span>Historiques & Passés</span>
+                <span class="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                    Bientôt
+                </span>
+            </div>
+
 
             {{-- ===================================================== --}}
             {{-- AUTRES RUBRIQUES (désactivées) --}}

@@ -16,7 +16,11 @@ use App\Http\Controllers\SousCategorieController;
 
 use App\Http\Controllers\Admin\DechargeController;
 use App\Http\Controllers\Admin\ProcurationController;
+use App\Http\Controllers\EntretienController;
 
+Route::middleware(['auth'])->group(function () {
+    Route::get('/historique-des-entretiens', [EntretienController::class, 'index'])->name('entretiens.index');
+});
 /*
 |--------------------------------------------------------------------------
 | AUTHENTIFICATION ADMINISTRATEUR
@@ -27,7 +31,7 @@ use App\Http\Controllers\Admin\ProcurationController;
 Route::get('/commande/{commande}/proforma', [CommandeController::class, 'voirProforma'])
     ->name('commande.proforma');
 
-    
+
 // Page de connexion
 Route::get('/Administateur', [AdminAuthController::class, 'showLogin'])
     ->name('admin.login');

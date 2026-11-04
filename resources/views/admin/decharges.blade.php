@@ -240,7 +240,7 @@
 
                                     <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
                                         <i data-lucide="box" class="w-4 h-4 text-emerald-600 shrink-0"></i>
-                                        Matériel / Doc 
+                                        Matériel / Doc
                                     </span>
 
                                 </label>
@@ -345,7 +345,7 @@
 
                                 <div class="md:col-span-2 min-w-0">
                                     <label for="email" class="block text-xs font-semibold text-slate-600 mb-1.5">
-                                        Adresse E-mail *
+                                        Adresse E-mail  *
                                     </label>
 
                                     <input
