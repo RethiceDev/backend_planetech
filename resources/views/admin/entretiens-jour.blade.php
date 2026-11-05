@@ -54,7 +54,7 @@
                     </div>
                 </div>
 
-                <div class="flex items-center gap-3">
+                <div class="flex flex-wrap items-center gap-3">
                     <span class="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-[10px] font-semibold text-slate-500 shadow-sm ring-1 ring-gray-100">
                         <span class="relative flex h-2 w-2">
                             <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
@@ -70,6 +70,24 @@
                         <i data-lucide="refresh-cw" class="h-4 w-4"></i>
                         Actualiser
                     </a>
+                        <a
+                            href="{{ route('admin.entretiens.jour.pdf', ['download' => 1]) }}"
+                            class="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100"
+                        >
+                            <i data-lucide="download" class="h-4 w-4"></i>
+                            Télécharger PDF
+                        </a>
+
+                        <button
+                            id="btnImprimer"
+                            type="button"
+                            data-print-url="{{ route('admin.entretiens.jour.pdf') }}"
+                            class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            <i data-lucide="printer" class="print-icon h-4 w-4"></i>
+                            <span class="print-spinner hidden h-4 w-4 animate-spin rounded-full border-2 border-slate-600 border-t-transparent"></span>
+                            <span class="print-label">Imprimer</span>
+                        </button>
                 </div>
 
             </div>
@@ -313,6 +331,52 @@
             lucide.createIcons();
         }
     });
+
+    // Impression directe du PDF du jour (iframe invisible)
+    const btnImprimer = document.getElementById('btnImprimer');
+
+    if (btnImprimer) {
+        btnImprimer.addEventListener('click', function () {
+            const bouton = this;
+            const url = bouton.dataset.printUrl + '?t=' + Date.now();
+
+            const icone = bouton.querySelector('.print-icon');
+            const spinner = bouton.querySelector('.print-spinner');
+            const label = bouton.querySelector('.print-label');
+
+            const finir = function () {
+                bouton.disabled = false;
+                icone.classList.remove('hidden');
+                spinner.classList.add('hidden');
+                label.textContent = 'Imprimer';
+            };
+
+            bouton.disabled = true;
+            icone.classList.add('hidden');
+            spinner.classList.remove('hidden');
+            label.textContent = 'Préparation...';
+
+            document.getElementById('iframeImpression')?.remove();
+
+            const iframe = document.createElement('iframe');
+            iframe.id = 'iframeImpression';
+            iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+            iframe.src = url;
+
+            iframe.onload = function () {
+                try {
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
+                } catch (e) {
+                    // Repli : ouvrir le PDF dans un nouvel onglet
+                    window.open(url, '_blank');
+                }
+                finir();
+            };
+
+            document.body.appendChild(iframe);
+        });
+    }
 </script>
 
 </body>

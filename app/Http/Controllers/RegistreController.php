@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Entretien;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -102,5 +103,29 @@ class RegistreController extends Controller
             'derniereArrivee',
             'dateJour'
         ));
+    }
+
+    /**
+     * Admin : PDF du registre du jour.
+     * - sans paramètre      -> affichage dans le navigateur (utilisé pour imprimer)
+     * - ?download=1         -> téléchargement du fichier
+     */
+    public function pdfAujourdhui(Request $request)
+    {
+        $entretiens = Entretien::whereDate('created_at', today())
+            ->oldest()
+            ->get();
+
+        $pdf = Pdf::loadView('admin.pdf.entretiens-jour', [
+            'entretiens'   => $entretiens,
+            'dateJour'     => now()->locale('fr')->translatedFormat('l d F Y'),
+            'genereLe'     => now()->locale('fr')->translatedFormat('d/m/Y à H:i'),
+        ])->setPaper('a4', 'portrait');
+
+        $nomFichier = 'entretiens-du-jour-' . today()->format('Y-m-d') . '.pdf';
+
+        return $request->boolean('download')
+            ? $pdf->download($nomFichier)
+            : $pdf->stream($nomFichier);
     }
 }

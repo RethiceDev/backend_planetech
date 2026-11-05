@@ -18,6 +18,8 @@ use App\Http\Controllers\Admin\DechargeController;
 use App\Http\Controllers\Admin\ProcurationController;
 use App\Http\Controllers\EntretienController;
 
+Route::get('/admin/entretiens-du-jour/pdf', [RegistreController::class, 'pdfAujourdhui'])->name('admin.entretiens.jour.pdf');
+
 Route::get('/admin/entretiens-du-jour', [RegistreController::class, 'aujourdhui'])->name('admin.entretiens.jour');
 
 Route::get('/historique-des-entretiens', [EntretienController::class, 'index'])->name('admin.entretiens');
