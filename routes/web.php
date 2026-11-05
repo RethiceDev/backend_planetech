@@ -13,14 +13,14 @@ use App\Http\Controllers\PartenaireController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\RealisationController;
 use App\Http\Controllers\SousCategorieController;
-
+use App\Http\Controllers\RegistreController;
 use App\Http\Controllers\Admin\DechargeController;
 use App\Http\Controllers\Admin\ProcurationController;
 use App\Http\Controllers\EntretienController;
 
-Route::middleware(['auth'])->group(function () {
-    Route::get('/historique-des-entretiens', [EntretienController::class, 'index'])->name('entretiens.index');
-});
+Route::get('/admin/entretiens-du-jour', [RegistreController::class, 'aujourdhui'])->name('admin.entretiens.jour');
+
+Route::get('/historique-des-entretiens', [EntretienController::class, 'index'])->name('admin.entretiens');
 /*
 |--------------------------------------------------------------------------
 | AUTHENTIFICATION ADMINISTRATEUR
