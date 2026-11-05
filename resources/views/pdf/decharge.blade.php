@@ -1,5 +1,6 @@
 @php
     use Carbon\Carbon;
+    use Illuminate\Support\Str;
 
     $etats = [
         'neuf'                  => 'Neuf',
@@ -13,11 +14,24 @@
         'materiel'       => 'DÉCHARGE DE REMISE DE MATÉRIEL',
         'responsabilite' => 'DÉCHARGE DE RESPONSABILITÉ',
     ];
-    $titre = $titres[$decharge->type] ?? 'DÉCHARGE';
 
     $dateLongue = Carbon::parse($decharge->created_at)->locale('fr')->translatedFormat('j F Y');
     $heure      = Carbon::parse($decharge->created_at)->format('H\hi');
     $lieu       = config('decharge.lieu');
+
+    // ---- Remise d'argent : salaire ou autre motif ? ----
+    // Détection par mots-clés dans le motif (sans accents, insensible à la casse).
+    // Si vous avez un champ dédié (ex. $decharge->categorie === 'salaire'), remplacez cette condition.
+    $estSalaire = false;
+    if ($decharge->type === 'argent') {
+        $motifNormalise = Str::lower(Str::ascii((string) $decharge->motif));
+        $estSalaire = Str::contains($motifNormalise, ['salaire', 'paie', 'paye', 'remuneration', 'solde de tout compte']);
+    }
+
+    $titre = $titres[$decharge->type] ?? 'DÉCHARGE';
+    if ($estSalaire) {
+        $titre = 'DÉCHARGE DE PAIEMENT DE SALAIRE';
+    }
 
     // Montant en lettres (nécessite l'extension PHP intl ; sinon on l'omet)
     $montantLettres = null;
@@ -30,9 +44,30 @@
     }
 
     // Accords singulier / pluriel pour le matériel
-    $nbLignes = $decharge->items->count();
-    $nbTotal  = (int) $decharge->items->sum('quantite');
-    $pluriel  = $nbTotal > 1;
+    $nbTotal = (int) $decharge->items->sum('quantite');
+    $pluriel = $nbTotal > 1;
+
+    // ---- Coordonnées : téléphone et e-mail facultatifs ----
+    $contactParts = [];
+    if (!empty($decharge->numero)) {
+        $contactParts[] = 'joignable au <strong>' . e($decharge->numero) . '</strong>';
+    }
+    if (!empty($decharge->email)) {
+        $contactParts[] = (empty($contactParts) ? 'joignable à' : 'et à')
+            . ' l\'adresse électronique <strong>' . e($decharge->email) . '</strong>';
+    }
+    $contact = implode(' ', $contactParts);
+
+    // Morceaux de phrase du préambule (construits ici pour éviter des directives Blade collées)
+    $contactTxt    = $contact !== '' ? ', ' . $contact : '';
+    $entrepriseTxt = !empty($decharge->entreprise)
+        ? ' au sein de <strong>' . e($decharge->entreprise) . '</strong>'
+        : '';
+
+    // ---- Partie qui signe à droite ----
+    $partieDroite = $decharge->type === 'materiel'
+        ? ($decharge->fournisseur_entreprise ?: 'le fournisseur')
+        : 'PLANETECH SARL';
 @endphp
 <!DOCTYPE html>
 <html lang="fr">
@@ -44,12 +79,13 @@
         body { font-family: 'DejaVu Sans', sans-serif; font-size: 11.5px; color: #1f2937; line-height: 1.6; }
 
         .entete { width: 100%; border-collapse: collapse; border-bottom: 3px double #000000; margin-bottom: 6px; }
-.entete td { vertical-align: middle; padding: 0 0 6px 0; }
-.entete .logo-cell { width: 95px; text-align: left; }
-.entete .logo-cell img { width: 85px; }
-.entete .txt-cell { text-align: center; }
-.entete .nom { font-family: 'Times', serif; font-size: 30px; font-weight: bold; letter-spacing: 2px; color: #000000; line-height: 1.1; border-bottom: 1px solid #000000; padding-bottom: 3px; margin-bottom: 4px; }
-.entete .lignes { font-family: 'Times', serif; font-size: 9.5px; font-style: italic; font-weight: bold; color: #000000; line-height: 1.45; }
+        .entete td { vertical-align: middle; padding: 0 0 6px 0; }
+        .entete .logo-cell { width: 95px; text-align: left; }
+        .entete .logo-cell img { width: 85px; }
+        .entete .txt-cell { text-align: center; }
+        .entete .nom { font-family: 'Times', serif; font-size: 30px; font-weight: bold; letter-spacing: 2px; color: #000000; line-height: 1.1; border-bottom: 1px solid #000000; padding-bottom: 3px; margin-bottom: 4px; }
+        .entete .lignes { font-family: 'Times', serif; font-size: 9.5px; font-style: italic; font-weight: bold; color: #000000; line-height: 1.45; }
+
         .titre { text-align: center; margin: 22px 0 4px; font-size: 16px; font-weight: bold; color: #1b4d3e; letter-spacing: 0.5px; }
         .ref { text-align: center; font-size: 10.5px; color: #6b7280; margin-bottom: 20px; }
 
@@ -63,11 +99,11 @@
 
         .conclusion { margin-top: 16px; }
 
+        /* Zones de signature : laissées vides, à remplir à la main après impression */
         table.sign { width: 100%; margin-top: 26px; border-collapse: collapse; page-break-inside: avoid; }
         table.sign td { width: 50%; vertical-align: top; text-align: center; padding: 0 10px; }
         .sign-titre { font-weight: bold; font-size: 11px; margin-bottom: 6px; }
         .sign-box { height: 90px; border-bottom: 1px solid #94a3b8; }
-        .sign-box img { max-height: 80px; max-width: 200px; }
         .sign-nom { font-size: 10.5px; margin-top: 4px; color: #475569; }
 
         .footer { position: fixed; bottom: -30px; left: 0; right: 0; text-align: center; font-size: 9px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 6px; }
@@ -75,40 +111,58 @@
 </head>
 <body>
 
-        <table class="entete">
-            <tr>
-                <td class="logo-cell">
-                    @if(!empty($logo))
-                        <img src="{{ $logo }}" alt="PLANETECH SARL">
-                    @endif
-                </td>
-                <td class="txt-cell">
-                    <div class="nom">PLANETECH SarL</div>
-                    <div class="lignes">
-                        Tous Travaux de BTP - Conception - Etudes et de Réalisation d'Ouvrage d'Art<br>
-                        Vente et Négoce de Matériel Electrique - Plomberie - Réseau Informatique - Téléphone<br>
-                        Climatiseur - Fond Caméra de Surveillance - Alarme - Incendie et Intrusion<br>
-                        Expertise et Maîtrise d'Ouvrage - Commerce Général
-                    </div>
-                </td>
-            </tr>
-        </table>
+    <table class="entete">
+        <tr>
+            <td class="logo-cell">
+                @if(!empty($logo))
+                    <img src="{{ $logo }}" alt="PLANETECH SARL">
+                @endif
+            </td>
+            <td class="txt-cell">
+                <div class="nom">PLANETECH SarL</div>
+                <div class="lignes">
+                    Tous Travaux de BTP - Conception - Etudes et de Réalisation d'Ouvrage d'Art<br>
+                    Vente et Négoce de Matériel Electrique - Plomberie - Réseau Informatique - Téléphone<br>
+                    Climatiseur - Fond Caméra de Surveillance - Alarme - Incendie et Intrusion<br>
+                    Expertise et Maîtrise d'Ouvrage - Commerce Général
+                </div>
+            </td>
+        </tr>
+    </table>
+
     <div class="titre">{{ $titre }}</div>
     <div class="ref">Référence : <strong>{{ $decharge->reference }}</strong></div>
 
     {{-- ===================== PRÉAMBULE (commun) ===================== --}}
     <p class="texte">
         Je soussigné(e), <strong>{{ $decharge->nom }}</strong>,
-        agissant en qualité de <strong>{{ $decharge->role }}</strong>@if($decharge->entreprise)
-        au sein de <strong>{{ $decharge->entreprise }}</strong>@endif,
-        joignable au <strong>{{ $decharge->numero }}</strong>
-        et à l'adresse électronique <strong>{{ $decharge->email }}</strong>,
+        agissant en qualité de <strong>{{ $decharge->role }}</strong>{!! $entrepriseTxt !!}{!! $contactTxt !!},
         reconnais et déclare par la présente ce qui suit :
     </p>
 
     {{-- ===================== CORPS SELON LE TYPE ===================== --}}
-    @if($decharge->type === 'argent')
+    @if($decharge->type === 'argent' && $estSalaire)
 
+        {{-- ---- Salaire ---- --}}
+        <p class="texte">
+            Avoir reçu de la société <strong>PLANETECH SARL</strong>, ce jour, la somme de
+            <strong>{{ number_format((float) $decharge->somme, 0, ',', ' ') }} FCFA</strong>@if($montantLettres)
+            (<em>{{ $montantLettres }}</em>)@endif,
+            en paiement de : <strong>{{ $decharge->motif }}</strong>.
+        </p>
+
+        <p class="texte">
+            Je reconnais avoir perçu cette somme intégralement, au titre de la rémunération indiquée ci-dessus.
+        </p>
+
+        <p class="texte">
+            En conséquence, <strong>PLANETECH SARL est déchargée de toute obligation de paiement</strong>
+            relative à cette somme, dont je reconnais avoir pris possession intégralement.
+        </p>
+
+    @elseif($decharge->type === 'argent')
+
+        {{-- ---- Remise de fonds (hors salaire) ---- --}}
         <p class="texte">
             Avoir reçu de la société <strong>PLANETECH SARL</strong>, ce jour, la somme de
             <strong>{{ number_format((float) $decharge->somme, 0, ',', ' ') }} FCFA</strong>@if($montantLettres)
@@ -127,7 +181,7 @@
             relative à cette somme, dont je reconnais avoir pris possession intégralement.
         </p>
 
-   @elseif($decharge->type === 'materiel')
+    @elseif($decharge->type === 'materiel')
 
         <p class="texte">
             Reçu de la part de <strong>{{ $decharge->fournisseur_nom ?? '........................' }}</strong>
@@ -170,7 +224,6 @@
             {{ $pluriel ? 'des éléments listés' : 'de l\'élément listé' }} ci-dessus à la date mentionnée.
         </p>
 
-
     @elseif($decharge->type === 'responsabilite')
 
         <p class="texte">
@@ -200,20 +253,16 @@
         Fait @if($lieu) à <strong>{{ $lieu }}</strong>, @endif le <strong>{{ $dateLongue }}</strong> à {{ $heure }}.
     </p>
 
-    {{-- ===================== SIGNATURES ===================== --}}
+    {{-- ===================== SIGNATURES (à la main après impression) ===================== --}}
     <table class="sign">
         <tr>
             <td>
                 <div class="sign-titre">Le déclarant<br><span style="font-weight:normal; font-size:9.5px;">(précédé de la mention « Lu et approuvé »)</span></div>
-                <div class="sign-box">
-                    @if($decharge->signature_data)
-                        <img src="{{ $decharge->signature_data }}" alt="Signature">
-                    @endif
-                </div>
+                <div class="sign-box"></div>
                 <div class="sign-nom">{{ $decharge->nom }}</div>
             </td>
             <td>
-                <div class="sign-titre">Pour {{ $decharge->fournisseur_entreprise }}<br><span style="font-weight:normal; font-size:9.5px;">(cachet et signature)</span></div>
+                <div class="sign-titre">Pour {{ $partieDroite }}<br><span style="font-weight:normal; font-size:9.5px;">(cachet et signature)</span></div>
                 <div class="sign-box"></div>
                 <div class="sign-nom">&nbsp;</div>
             </td>
@@ -221,7 +270,7 @@
     </table>
 
     <div class="footer">
-        PLANETECH SARL — Décharge {{ $decharge->reference }} — Signée numériquement le {{ $dateLongue }} — © {{ date('Y') }}
+        PLANETECH SARL — Décharge {{ $decharge->reference }} — Établie le {{ $dateLongue }} — © {{ date('Y') }}
     </div>
 
 </body>

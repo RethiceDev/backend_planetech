@@ -29,7 +29,6 @@
     </script>
 
     <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
 
     <style>
         [x-cloak],
@@ -60,11 +59,6 @@
         select:disabled,
         textarea:disabled {
             cursor: not-allowed;
-        }
-
-        #signature-pad {
-            display: block;
-            touch-action: none;
         }
 
         .materiel-row {
@@ -165,7 +159,7 @@
                     </h1>
 
                     <p class="text-sm text-slate-muted mt-1 leading-relaxed">
-                        Établissez des fiches de décharge multi-matériels signées numériquement.
+                        Établissez des fiches de décharge à imprimer puis à signer à la main.
                     </p>
                 </div>
 
@@ -192,7 +186,7 @@
                         method="POST"
                         id="decharge-form"
                         class="space-y-5"
-                     >
+                    >
                         @csrf
 
                         {{-- TYPE DE DÉCHARGE --}}
@@ -217,7 +211,6 @@
                                         value="argent"
                                         class="sr-only"
                                         {{ $oldType === 'argent' ? 'checked' : '' }}
-                                        onchange="toggleTypeFields('argent')"
                                     >
 
                                     <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
@@ -235,7 +228,6 @@
                                         value="materiel"
                                         class="sr-only"
                                         {{ $oldType === 'materiel' ? 'checked' : '' }}
-                                        onchange="toggleTypeFields('materiel')"
                                     >
 
                                     <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
@@ -253,7 +245,6 @@
                                         value="responsabilite"
                                         class="sr-only"
                                         {{ $oldType === 'responsabilite' ? 'checked' : '' }}
-                                        onchange="toggleTypeFields('responsabilite')"
                                     >
 
                                     <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
@@ -332,7 +323,7 @@
                                     </label>
 
                                     <input
-                                        type="number"
+                                        type="tel"
                                         id="numero"
                                         name="numero"
                                         value="{{ old('numero') }}"
@@ -345,7 +336,7 @@
 
                                 <div class="md:col-span-2 min-w-0">
                                     <label for="email" class="block text-xs font-semibold text-slate-600 mb-1.5">
-                                        Adresse E-mail  *
+                                        Adresse e-mail <span class="font-normal text-slate-400">(facultatif)</span>
                                     </label>
 
                                     <input
@@ -353,11 +344,14 @@
                                         id="email"
                                         name="email"
                                         value="{{ old('email') }}"
-                                        required
                                         maxlength="255"
                                         autocomplete="email"
                                         class="w-full min-w-0 px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white text-sm"
                                     >
+
+                                    <p class="mt-1.5 text-[11px] text-slate-400">
+                                        Si une adresse est renseignée, la décharge lui sera envoyée par e-mail.
+                                    </p>
                                 </div>
 
                             </div>
@@ -401,7 +395,7 @@
                                         id="motif"
                                         name="motif"
                                         value="{{ old('motif') }}"
-                                        placeholder="Ex. : Achat d'outillage"
+                                        placeholder="Ex. : Salaire de novembre 2026"
                                         required
                                         maxlength="255"
                                         class="w-full min-w-0 px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white text-sm"
@@ -409,6 +403,14 @@
                                 </div>
 
                             </div>
+
+                            <p class="flex items-start gap-2 rounded-lg bg-emerald-50/70 px-3 py-2 text-[11px] leading-relaxed text-emerald-800">
+                                <i data-lucide="info" class="w-4 h-4 shrink-0 mt-px"></i>
+                                <span>
+                                    Pour un versement de salaire, incluez le mot « salaire » dans le motif :
+                                    le texte de la décharge sera adapté automatiquement.
+                                </span>
+                            </p>
 
                         </div>
 
@@ -479,7 +481,7 @@
                                         </label>
 
                                         <input
-                                            type="text"
+                                            type="tel"
                                             id="fournisseur_numero"
                                             name="fournisseur_numero"
                                             value="{{ old('fournisseur_numero') }}"
@@ -492,7 +494,7 @@
 
                                     <div class="min-w-0">
                                         <label for="fournisseur_email" class="block text-xs font-semibold text-slate-700 mb-1.5">
-                                            E-mail du livreur *
+                                            E-mail du livreur <span class="font-normal text-slate-400">(facultatif)</span>
                                         </label>
 
                                         <input
@@ -500,7 +502,6 @@
                                             id="fournisseur_email"
                                             name="fournisseur_email"
                                             value="{{ old('fournisseur_email') }}"
-                                            required
                                             maxlength="255"
                                             placeholder="livreur@entreprise.com"
                                             class="w-full min-w-0 px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white text-sm"
@@ -540,115 +541,98 @@
 
                                 <div id="materiels-container" class="space-y-3">
 
-                                    {{-- PREMIÈRE LIGNE --}}
+                                    {{-- PREMIÈRE LIGNE (12 colonnes) --}}
 
-                                    <!-- Ligne de matériel unifiée (12 colonnes) -->
-                                   <!-- Ligne de matériel unifiée (12 colonnes équilibrées) -->
-<div class="materiel-row p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end mb-4">
+                                    <div class="materiel-row p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end mb-4">
 
-    <!-- Désignation (3 colonnes) -->
-    <div class="min-w-0 lg:col-span-3">
-        <label for="materiel-designation-0" class="block text-xs font-semibold text-slate-600 mb-1.5">
-            Désignation *
-        </label>
-        <input
-            type="text"
-            id="materiel-designation-0"
-            name="materiels[0][designation]"
-            value="{{ old('materiels.0.designation') }}"
-            placeholder="Ex. : Routeur, ordinateur"
-            required
-            maxlength="255"
-            class="w-full min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm"
-        >
-    </div>
+                                        <div class="min-w-0 lg:col-span-3">
+                                            <label for="materiel-designation-0" class="block text-xs font-semibold text-slate-600 mb-1.5">
+                                                Désignation *
+                                            </label>
+                                            <input
+                                                type="text"
+                                                id="materiel-designation-0"
+                                                name="materiels[0][designation]"
+                                                value="{{ old('materiels.0.designation') }}"
+                                                placeholder="Ex. : Routeur, ordinateur"
+                                                required
+                                                maxlength="255"
+                                                class="w-full min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm"
+                                            >
+                                        </div>
 
-    <!-- Quantité (2 colonnes - élargi) -->
-    <div class="min-w-0 lg:col-span-2">
-        <label for="materiel-quantite-0" class="block text-xs font-semibold text-slate-600 mb-1.5">
-            Quantité
-        </label>
-        <input
-            type="number"
-            id="materiel-quantite-0"
-            name="materiels[0][quantite]"
-            value="{{ old('materiels.0.quantite', 1) }}"
-            min="1"
-            step="1"
-            placeholder="Qté"
-            class="w-full min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm quantite"
-        >
-    </div>
+                                        <div class="min-w-0 lg:col-span-2">
+                                            <label for="materiel-quantite-0" class="block text-xs font-semibold text-slate-600 mb-1.5">
+                                                Quantité
+                                            </label>
+                                            <input
+                                                type="number"
+                                                id="materiel-quantite-0"
+                                                name="materiels[0][quantite]"
+                                                value="{{ old('materiels.0.quantite', 1) }}"
+                                                min="1"
+                                                step="1"
+                                                placeholder="Qté"
+                                                class="w-full min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm quantite"
+                                            >
+                                        </div>
 
-    <!-- Prix unitaire (2 colonnes) -->
-    <div class="min-w-0 lg:col-span-2">
-        <label for="materiel-prix-unitaire-0" class="block text-xs font-semibold text-slate-600 mb-1.5">
-            Prix unitaire
-        </label>
-        <input
-            type="number"
-            id="materiel-prix-unitaire-0"
-            name="materiels[0][prix_unitaire]"
-            value="{{ old('materiels.0.prix_unitaire') }}"
-            min="0"
-            step="0.01"
-            placeholder="FCFA"
-            class="w-full min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm prix-unitaire"
-        >
-    </div>
+                                        <div class="min-w-0 lg:col-span-2">
+                                            <label for="materiel-prix-unitaire-0" class="block text-xs font-semibold text-slate-600 mb-1.5">
+                                                Prix unitaire
+                                            </label>
+                                            <input
+                                                type="number"
+                                                id="materiel-prix-unitaire-0"
+                                                name="materiels[0][prix_unitaire]"
+                                                value="{{ old('materiels.0.prix_unitaire') }}"
+                                                min="0"
+                                                step="0.01"
+                                                placeholder="FCFA"
+                                                class="w-full min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm prix-unitaire"
+                                            >
+                                        </div>
 
-    <!-- Prix global - Calculé automatiquement (2 colonnes) -->
-    <div class="min-w-0 lg:col-span-2">
-        <label for="materiel-prix-global-0" class="block text-xs font-semibold text-slate-600 mb-1.5">
-            Prix global
-        </label>
-        <input
-            type="number"
-            id="materiel-prix-global-0"
-            name="materiels[0][prix_global]"
-            value="{{ old('materiels.0.prix_global') }}"
-            min="0"
-            step="0.01"
-            placeholder="FCFA"
-            class="w-full min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm prix-global"
-            readonly
-        >
-    </div>
+                                        <div class="min-w-0 lg:col-span-2">
+                                            <label for="materiel-prix-global-0" class="block text-xs font-semibold text-slate-600 mb-1.5">
+                                                Prix global
+                                            </label>
+                                            <input
+                                                type="number"
+                                                id="materiel-prix-global-0"
+                                                name="materiels[0][prix_global]"
+                                                value="{{ old('materiels.0.prix_global') }}"
+                                                min="0"
+                                                step="0.01"
+                                                placeholder="FCFA"
+                                                class="w-full min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm prix-global"
+                                                readonly
+                                            >
+                                        </div>
 
-    <!-- État (3 colonnes) -->
-    <div class="min-w-0 lg:col-span-3">
-        <label for="materiel-etat-0" class="block text-xs font-semibold text-slate-600 mb-1.5">
-            État *
-        </label>
-        <select
-            id="materiel-etat-0"
-            name="materiels[0][etat]"
-            required
-            class="w-full min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm"
-        >
-            <option value="neuf" {{ old('materiels.0.etat', 'neuf') === 'neuf' ? 'selected' : '' }}>
-                Neuf
-            </option>
-            <option value="partiellement_utilise" {{ old('materiels.0.etat') === 'partiellement_utilise' ? 'selected' : '' }}>
-                Partiellement utilisé
-            </option>
-            <option value="vieux" {{ old('materiels.0.etat') === 'vieux' ? 'selected' : '' }}>
-                Vieux
-            </option>
-            <option value="defectueux" {{ old('materiels.0.etat') === 'defectueux' ? 'selected' : '' }}>
-                Défectueux
-            </option>
-        </select>
-    </div>
+                                        <div class="min-w-0 lg:col-span-3">
+                                            <label for="materiel-etat-0" class="block text-xs font-semibold text-slate-600 mb-1.5">
+                                                État *
+                                            </label>
+                                            <select
+                                                id="materiel-etat-0"
+                                                name="materiels[0][etat]"
+                                                required
+                                                class="w-full min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm"
+                                            >
+                                                <option value="neuf" {{ old('materiels.0.etat', 'neuf') === 'neuf' ? 'selected' : '' }}>Neuf</option>
+                                                <option value="partiellement_utilise" {{ old('materiels.0.etat') === 'partiellement_utilise' ? 'selected' : '' }}>Partiellement utilisé</option>
+                                                <option value="vieux" {{ old('materiels.0.etat') === 'vieux' ? 'selected' : '' }}>Vieux</option>
+                                                <option value="defectueux" {{ old('materiels.0.etat') === 'defectueux' ? 'selected' : '' }}>Défectueux</option>
+                                            </select>
+                                        </div>
 
-</div>
+                                    </div>
                                 </div>
 
                             </div>
 
                         </div>
-
-
 
                         {{-- SECTION RESPONSABILITÉ --}}
 
@@ -672,60 +656,26 @@
 
                         </div>
 
-                        {{-- SIGNATURE NUMÉRIQUE --}}
-
-                        <div class="pt-5 border-t border-gray-100 space-y-2">
-
-                            <div class="flex justify-between items-center gap-3">
-
-                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">
-                                    Signature numérique *
-                                </label>
-
-                                <button
-                                    type="button"
-                                    id="clear-signature"
-                                    class="shrink-0 text-xs font-semibold text-rose-600 hover:text-rose-800 hover:underline"
-                                >
-                                    Effacer
-                                </button>
-
-                            </div>
-
-                            <p class="text-xs text-slate-500">
-                                Signez dans la zone ci-dessous avec votre souris ou votre doigt.
-                            </p>
-
-                            <div class="border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 relative h-36 sm:h-40 overflow-hidden">
-
-                                <canvas
-                                    id="signature-pad"
-                                    class="w-full h-full rounded-xl cursor-crosshair"
-                                    aria-label="Zone de signature numérique"
-                                ></canvas>
-
-                            </div>
-
-                            <input
-                                type="hidden"
-                                name="signature_data"
-                                id="signature-input"
-                            >
-
-                        </div>
-
                         {{-- BOUTON DE VALIDATION --}}
 
-                        <div class="pt-1">
+                        <div class="pt-5 border-t border-gray-100 space-y-3">
+
+                            <p class="flex items-start gap-2 text-xs text-slate-500 leading-relaxed">
+                                <i data-lucide="printer" class="w-4 h-4 shrink-0 mt-px text-forest-700"></i>
+                                <span>
+                                    La décharge est générée en PDF. Imprimez-la puis faites-la signer à la main
+                                    (déclarant et cachet de l'entreprise).
+                                </span>
+                            </p>
 
                             <button
                                 type="submit"
                                 id="submit-btn"
                                 class="w-full min-h-12 px-4 py-3 bg-forest-700 hover:bg-forest-900 disabled:cursor-not-allowed disabled:opacity-60 text-white text-sm font-semibold rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
                             >
-                                <i data-lucide="send" class="w-4 h-4 shrink-0"></i>
+                                <i data-lucide="file-check" class="w-4 h-4 shrink-0"></i>
 
-                                <span>Valider et envoyer par e-mail</span>
+                                <span>Valider la décharge</span>
                             </button>
 
                         </div>
@@ -738,160 +688,160 @@
 
                 <aside class="lg:col-span-5 min-w-0 bg-white rounded-2xl border border-gray-100 p-5 lg:p-6 shadow-sm space-y-4 decharge-card">
 
-    {{-- EN-TÊTE --}}
-    <div class="flex items-center justify-between gap-3 border-b border-gray-100 pb-4">
-        <div class="flex items-center gap-3 min-w-0">
-            <div class="w-10 h-10 shrink-0 rounded-xl bg-emerald-50 flex items-center justify-center">
-                <i data-lucide="history" class="w-5 h-5 text-forest-700"></i>
-            </div>
-            <div class="min-w-0">
-                <h2 class="text-lg font-semibold text-slate-900">Historique récent</h2>
-                <p class="text-xs text-slate-500 mt-0.5">Consultez, imprimez ou téléchargez les décharges.</p>
-            </div>
-        </div>
-
-        <span class="shrink-0 inline-flex items-center rounded-full bg-forest-50 text-forest-700 text-xs font-bold px-3 py-1">
-            {{ $decharges->total() }}
-        </span>
-    </div>
-
-    <div class="space-y-3">
-
-        @forelse($decharges as $d)
-
-            @php
-                $typeInfo = match($d->type) {
-                    'argent' => [
-                        'label' => 'Argent',
-                        'icon'  => 'banknote',
-                        'bar'   => 'border-l-amber-400',
-                        'badge' => 'bg-amber-50 text-amber-700',
-                    ],
-                    'materiel' => [
-                        'label' => 'Matériel / Document',
-                        'icon'  => 'package',
-                        'bar'   => 'border-l-blue-400',
-                        'badge' => 'bg-blue-50 text-blue-700',
-                    ],
-                    'responsabilite' => [
-                        'label' => 'Responsabilité',
-                        'icon'  => 'shield-check',
-                        'bar'   => 'border-l-violet-400',
-                        'badge' => 'bg-violet-50 text-violet-700',
-                    ],
-                    default => [
-                        'label' => ucfirst((string) $d->type),
-                        'icon'  => 'file-text',
-                        'bar'   => 'border-l-slate-300',
-                        'badge' => 'bg-slate-100 text-slate-600',
-                    ],
-                };
-            @endphp
-
-            <article class="historique-card group p-4 rounded-xl border border-slate-100 border-l-4 {{ $typeInfo['bar'] }} bg-white space-y-3 shadow-sm transition hover:shadow-md hover:-translate-y-0.5">
-
-                {{-- RÉFÉRENCE ET DATE --}}
-                <div class="flex flex-wrap justify-between items-center gap-2">
-                    <span class="font-bold text-xs text-forest-700 bg-emerald-100 px-2.5 py-1 rounded-md">
-                        {{ $d->reference }}
-                    </span>
-
-                    <span class="inline-flex items-center gap-1 text-xs text-slate-400">
-                        <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
-                        {{ $d->created_at->format('d/m/Y') }}
-                    </span>
-                </div>
-
-                {{-- BÉNÉFICIAIRE ET TYPE --}}
-                <div class="flex items-start justify-between gap-3">
-                    <p class="text-sm font-semibold text-slate-800 min-w-0 break-words">
-                        {{ $d->nom }}
-                    </p>
-
-                    <span class="shrink-0 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold {{ $typeInfo['badge'] }}">
-                        <i data-lucide="{{ $typeInfo['icon'] }}" class="w-3.5 h-3.5"></i>
-                        {{ $typeInfo['label'] }}
-                    </span>
-                </div>
-
-                {{-- DÉTAILS DES MATÉRIELS --}}
-                @if($d->type === 'materiel' && $d->items && $d->items->count() > 0)
-                    <div class="text-xs bg-slate-50 p-3 rounded-lg border border-slate-100 text-slate-600 space-y-2">
-                        @foreach($d->items as $item)
-                            <div class="flex items-start gap-2">
-                                <span class="text-emerald-600 font-bold">•</span>
-                                <span class="min-w-0">
-                                    {{ $item->designation }}
-                                    <span class="text-slate-400">(Qté : {{ $item->quantite }})</span>
-                                </span>
+                    {{-- EN-TÊTE --}}
+                    <div class="flex items-center justify-between gap-3 border-b border-gray-100 pb-4">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <div class="w-10 h-10 shrink-0 rounded-xl bg-emerald-50 flex items-center justify-center">
+                                <i data-lucide="history" class="w-5 h-5 text-forest-700"></i>
                             </div>
-                        @endforeach
+                            <div class="min-w-0">
+                                <h2 class="text-lg font-semibold text-slate-900">Historique récent</h2>
+                                <p class="text-xs text-slate-500 mt-0.5">Consultez, imprimez ou téléchargez les décharges.</p>
+                            </div>
+                        </div>
+
+                        <span class="shrink-0 inline-flex items-center rounded-full bg-forest-50 text-forest-700 text-xs font-bold px-3 py-1">
+                            {{ $decharges->total() }}
+                        </span>
                     </div>
-                @endif
 
-                {{-- ACTIONS --}}
-                <div class="historique-actions flex items-center gap-2 pt-1">
+                    <div class="space-y-3">
 
-                    {{-- VOIR --}}
-                    <a
-                        href="{{ route('admin.decharges.pdf', $d) }}"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-forest-700 hover:bg-forest-900 text-white text-xs font-semibold rounded-lg transition-all"
-                    >
-                        <i data-lucide="eye" class="w-4 h-4 shrink-0"></i>
-                        <span>Voir</span>
-                    </a>
+                        @forelse($decharges as $d)
 
-                    {{-- IMPRIMER (lance l'impression automatiquement) --}}
-                    <button
-                        type="button"
-                        data-print-url="{{ route('admin.decharges.pdf', $d) }}"
-                        class="btn-print flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-white hover:bg-emerald-50 text-forest-700 border border-forest-700/30 text-xs font-semibold rounded-lg transition-all disabled:opacity-60 disabled:cursor-wait"
-                        title="Imprimer la décharge {{ $d->reference }}"
-                        aria-label="Imprimer la décharge {{ $d->reference }}"
-                    >
-                        <i data-lucide="printer" class="w-4 h-4 shrink-0 print-icon"></i>
-                        <span class="print-spinner hidden w-4 h-4 shrink-0 rounded-full border-2 border-forest-700 border-t-transparent animate-spin"></span>
-                        <span class="print-label">Imprimer</span>
-                    </button>
+                            @php
+                                $typeInfo = match($d->type) {
+                                    'argent' => [
+                                        'label' => 'Argent',
+                                        'icon'  => 'banknote',
+                                        'bar'   => 'border-l-amber-400',
+                                        'badge' => 'bg-amber-50 text-amber-700',
+                                    ],
+                                    'materiel' => [
+                                        'label' => 'Matériel / Document',
+                                        'icon'  => 'package',
+                                        'bar'   => 'border-l-blue-400',
+                                        'badge' => 'bg-blue-50 text-blue-700',
+                                    ],
+                                    'responsabilite' => [
+                                        'label' => 'Responsabilité',
+                                        'icon'  => 'shield-check',
+                                        'bar'   => 'border-l-violet-400',
+                                        'badge' => 'bg-violet-50 text-violet-700',
+                                    ],
+                                    default => [
+                                        'label' => ucfirst((string) $d->type),
+                                        'icon'  => 'file-text',
+                                        'bar'   => 'border-l-slate-300',
+                                        'badge' => 'bg-slate-100 text-slate-600',
+                                    ],
+                                };
+                            @endphp
 
-                    {{-- TÉLÉCHARGER --}}
-                    <a
-                        href="{{ route('admin.decharges.pdf', ['decharge' => $d, 'download' => 1]) }}"
-                        class="shrink-0 inline-flex items-center justify-center px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-semibold rounded-lg transition-all"
-                        title="Télécharger le PDF"
-                        aria-label="Télécharger le PDF de la décharge {{ $d->reference }}"
-                    >
-                        <i data-lucide="download" class="w-4 h-4"></i>
-                    </a>
+                            <article class="historique-card group p-4 rounded-xl border border-slate-100 border-l-4 {{ $typeInfo['bar'] }} bg-white space-y-3 shadow-sm transition hover:shadow-md hover:-translate-y-0.5">
 
-                </div>
+                                {{-- RÉFÉRENCE ET DATE --}}
+                                <div class="flex flex-wrap justify-between items-center gap-2">
+                                    <span class="font-bold text-xs text-forest-700 bg-emerald-100 px-2.5 py-1 rounded-md">
+                                        {{ $d->reference }}
+                                    </span>
 
-            </article>
+                                    <span class="inline-flex items-center gap-1 text-xs text-slate-400">
+                                        <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+                                        {{ $d->created_at->format('d/m/Y') }}
+                                    </span>
+                                </div>
 
-        @empty
+                                {{-- BÉNÉFICIAIRE ET TYPE --}}
+                                <div class="flex items-start justify-between gap-3">
+                                    <p class="text-sm font-semibold text-slate-800 min-w-0 break-words">
+                                        {{ $d->nom }}
+                                    </p>
 
-            <div class="flex flex-col items-center justify-center text-center py-10 px-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/50">
-                <div class="w-12 h-12 rounded-full bg-white border border-slate-100 flex items-center justify-center mb-3">
-                    <i data-lucide="file-text" class="w-6 h-6 text-slate-400"></i>
-                </div>
-                <p class="text-sm font-medium text-slate-600">Aucune décharge enregistrée</p>
-                <p class="text-xs text-slate-400 mt-1">Les nouvelles décharges apparaîtront ici.</p>
-            </div>
+                                    <span class="shrink-0 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold {{ $typeInfo['badge'] }}">
+                                        <i data-lucide="{{ $typeInfo['icon'] }}" class="w-3.5 h-3.5"></i>
+                                        {{ $typeInfo['label'] }}
+                                    </span>
+                                </div>
 
-        @endforelse
+                                {{-- DÉTAILS DES MATÉRIELS --}}
+                                @if($d->type === 'materiel' && $d->items && $d->items->count() > 0)
+                                    <div class="text-xs bg-slate-50 p-3 rounded-lg border border-slate-100 text-slate-600 space-y-2">
+                                        @foreach($d->items as $item)
+                                            <div class="flex items-start gap-2">
+                                                <span class="text-emerald-600 font-bold">•</span>
+                                                <span class="min-w-0">
+                                                    {{ $item->designation }}
+                                                    <span class="text-slate-400">(Qté : {{ $item->quantite }})</span>
+                                                </span>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
 
-    </div>
+                                {{-- ACTIONS --}}
+                                <div class="historique-actions flex items-center gap-2 pt-1">
 
-    {{-- PAGINATION --}}
-    @if($decharges->hasPages())
-        <div class="pt-3 border-t border-gray-100 overflow-x-auto">
-            {{ $decharges->links() }}
-        </div>
-    @endif
+                                    {{-- VOIR --}}
+                                    <a
+                                        href="{{ route('admin.decharges.pdf', $d) }}"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-forest-700 hover:bg-forest-900 text-white text-xs font-semibold rounded-lg transition-all"
+                                    >
+                                        <i data-lucide="eye" class="w-4 h-4 shrink-0"></i>
+                                        <span>Voir</span>
+                                    </a>
 
-</aside>
+                                    {{-- IMPRIMER (lance l'impression automatiquement) --}}
+                                    <button
+                                        type="button"
+                                        data-print-url="{{ route('admin.decharges.pdf', $d) }}"
+                                        class="btn-print flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-white hover:bg-emerald-50 text-forest-700 border border-forest-700/30 text-xs font-semibold rounded-lg transition-all disabled:opacity-60 disabled:cursor-wait"
+                                        title="Imprimer la décharge {{ $d->reference }}"
+                                        aria-label="Imprimer la décharge {{ $d->reference }}"
+                                    >
+                                        <i data-lucide="printer" class="w-4 h-4 shrink-0 print-icon"></i>
+                                        <span class="print-spinner hidden w-4 h-4 shrink-0 rounded-full border-2 border-forest-700 border-t-transparent animate-spin"></span>
+                                        <span class="print-label">Imprimer</span>
+                                    </button>
+
+                                    {{-- TÉLÉCHARGER --}}
+                                    <a
+                                        href="{{ route('admin.decharges.pdf', ['decharge' => $d, 'download' => 1]) }}"
+                                        class="shrink-0 inline-flex items-center justify-center px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-semibold rounded-lg transition-all"
+                                        title="Télécharger le PDF"
+                                        aria-label="Télécharger le PDF de la décharge {{ $d->reference }}"
+                                    >
+                                        <i data-lucide="download" class="w-4 h-4"></i>
+                                    </a>
+
+                                </div>
+
+                            </article>
+
+                        @empty
+
+                            <div class="flex flex-col items-center justify-center text-center py-10 px-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/50">
+                                <div class="w-12 h-12 rounded-full bg-white border border-slate-100 flex items-center justify-center mb-3">
+                                    <i data-lucide="file-text" class="w-6 h-6 text-slate-400"></i>
+                                </div>
+                                <p class="text-sm font-medium text-slate-600">Aucune décharge enregistrée</p>
+                                <p class="text-xs text-slate-400 mt-1">Les nouvelles décharges apparaîtront ici.</p>
+                            </div>
+
+                        @endforelse
+
+                    </div>
+
+                    {{-- PAGINATION --}}
+                    @if($decharges->hasPages())
+                        <div class="pt-3 border-t border-gray-100 overflow-x-auto">
+                            {{ $decharges->links() }}
+                        </div>
+                    @endif
+
+                </aside>
 
             </div>
 
@@ -902,6 +852,7 @@
 </div>
 
 
+{{-- IMPRESSION DIRECTE DU PDF --}}
 <script>
 (function () {
     let frame = null;
@@ -976,10 +927,9 @@
 })();
 </script>
 
+{{-- FORMULAIRE --}}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-
-    // INITIALISATION DES ICÔNES
 
     if (window.lucide) {
         lucide.createIcons();
@@ -988,7 +938,6 @@ document.addEventListener('DOMContentLoaded', function () {
     // 1. GESTION DES TYPES DE DÉCHARGE
 
     const form = document.getElementById('decharge-form');
-
     const typeInputs = document.querySelectorAll('input[name="type"]');
 
     function toggleTypeFields(selectedType) {
@@ -1005,13 +954,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
             section.hidden = !active;
 
+            // Les champs masqués sont désactivés : ils ne sont ni validés ni envoyés.
             section.querySelectorAll('input, select, textarea').forEach(function (field) {
                 field.disabled = !active;
             });
 
         });
-
-        // Mettre à jour l'affichage des boutons de type.
 
         if (window.lucide) {
             lucide.createIcons();
@@ -1031,7 +979,6 @@ document.addEventListener('DOMContentLoaded', function () {
     // 2. GESTION DES LIGNES DE MATÉRIEL
 
     const addMaterielButton = document.getElementById('add-materiel-btn');
-
     const materielsContainer = document.getElementById('materiels-container');
 
     let materielIndex = 1;
@@ -1045,7 +992,7 @@ document.addEventListener('DOMContentLoaded', function () {
         row.className = 'materiel-row p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end';
 
         row.innerHTML = `
-            <div class="min-w-0 lg:col-span-4">
+            <div class="min-w-0 lg:col-span-3">
                 <label for="materiel-designation-${index}" class="block text-xs font-semibold text-slate-600 mb-1.5">
                     Désignation *
                 </label>
@@ -1061,7 +1008,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 >
             </div>
 
-            <div class="min-w-0 lg:col-span-1">
+            <div class="min-w-0 lg:col-span-2">
                 <label for="materiel-quantite-${index}" class="block text-xs font-semibold text-slate-600 mb-1.5">
                     Quantité
                 </label>
@@ -1074,7 +1021,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     min="1"
                     step="1"
                     placeholder="Qté"
-                    class="w-full min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm"
+                    class="w-full min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm quantite"
                 >
             </div>
 
@@ -1106,7 +1053,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     min="0"
                     step="0.01"
                     placeholder="FCFA"
-                    class="w-full min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm prix-global"
+                    class="w-full min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm prix-global"
+                    readonly
                 >
             </div>
 
@@ -1143,9 +1091,7 @@ document.addEventListener('DOMContentLoaded', function () {
         materielsContainer.appendChild(row);
 
         if (window.lucide) {
-            lucide.createIcons({
-                nodes: [row]
-            });
+            lucide.createIcons({ nodes: [row] });
         }
 
         const designation = row.querySelector('input[name$="[designation]"]');
@@ -1155,8 +1101,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // SUPPRESSION D'UNE LIGNE
-
+    // Suppression d'une ligne
     materielsContainer.addEventListener('click', function (event) {
 
         const button = event.target.closest('.remove-materiel');
@@ -1172,142 +1117,43 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // 3. SIGNATURE NUMÉRIQUE
+    // 3. CALCUL AUTOMATIQUE DU PRIX GLOBAL
 
-    const canvas = document.getElementById('signature-pad');
+    document.addEventListener('input', function (e) {
 
-    const signatureInput = document.getElementById('signature-input');
-
-    const clearSignatureButton = document.getElementById('clear-signature');
-
-    const signaturePad = new SignaturePad(canvas, {
-        backgroundColor: 'rgb(248, 250, 252)',
-        penColor: '#0f2c23',
-        minWidth: 0.8,
-        maxWidth: 2.5
-    });
-
-    let signatureHasBeenDrawn = false;
-
-    function resizeCanvas() {
-
-        const ratio = Math.max(window.devicePixelRatio || 1, 1);
-
-        const rect = canvas.getBoundingClientRect();
-
-        if (!rect.width || !rect.height) {
+        if (!e.target.classList.contains('quantite') && !e.target.classList.contains('prix-unitaire')) {
             return;
         }
 
-        // Sauvegarder le tracé avant de redimensionner le canvas.
+        const row = e.target.closest('.materiel-row');
 
-        const previousSignature = signaturePad.isEmpty()
-            ? null
-            : signaturePad.toData();
-
-        canvas.width = Math.round(rect.width * ratio);
-
-        canvas.height = Math.round(rect.height * ratio);
-
-        const context = canvas.getContext('2d');
-
-        context.setTransform(ratio, 0, 0, ratio, 0, 0);
-
-        signaturePad.clear();
-
-        if (previousSignature && previousSignature.length > 0) {
-
-            signaturePad.fromData(previousSignature);
-
-            signatureHasBeenDrawn = true;
-
-        } else {
-
-            signatureHasBeenDrawn = false;
-        }
-    }
-
-    // Attendre que le navigateur calcule la taille réelle du canvas.
-
-    requestAnimationFrame(resizeCanvas);
-
-    let resizeTimeout;
-
-    window.addEventListener('resize', function () {
-
-        clearTimeout(resizeTimeout);
-
-        resizeTimeout = setTimeout(resizeCanvas, 150);
-    });
-
-    signaturePad.addEventListener('beginStroke', function () {
-        signatureHasBeenDrawn = true;
-    });
-
-    clearSignatureButton.addEventListener('click', function () {
-
-        signaturePad.clear();
-
-        signatureHasBeenDrawn = false;
-
-        signatureInput.value = '';
-    });
-
-    // 4. VALIDATION ET ENVOI DU FORMULAIRE
-
-    form.addEventListener('submit', function (event) {
-
-        if (signaturePad.isEmpty() || !signatureHasBeenDrawn) {
-
-            event.preventDefault();
-
-            alert('Veuillez apposer votre signature avant de valider la décharge.');
-
+        if (!row) {
             return;
         }
 
-        signatureInput.value = signaturePad.toDataURL('image/png');
+        const quantite = parseFloat(row.querySelector('.quantite').value) || 0;
+        const prixUnitaire = parseFloat(row.querySelector('.prix-unitaire').value) || 0;
+        const prixGlobal = quantite * prixUnitaire;
 
-        // Empêcher les doubles soumissions.
+        row.querySelector('.prix-global').value = prixGlobal > 0 ? prixGlobal.toFixed(2) : '';
+    });
+
+    // 4. ENVOI DU FORMULAIRE : empêcher les doubles soumissions
+
+    form.addEventListener('submit', function () {
 
         const submitButton = document.getElementById('submit-btn');
 
         submitButton.disabled = true;
-
         submitButton.classList.add('opacity-60');
 
         const buttonText = submitButton.querySelector('span');
 
         if (buttonText) {
-            buttonText.textContent = 'Envoi en cours...';
+            buttonText.textContent = 'Enregistrement en cours...';
         }
     });
 
-});
-
-
-
-document.addEventListener('input', function (e) {
-    // Vérifie si l'élément modifié fait partie de la quantité ou du prix unitaire
-    if (e.target.classList.contains('quantite') || e.target.classList.contains('prix-unitaire')) {
-        // Trouve la ligne parente (conteneur de la ligne de matériel)
-        const row = e.target.closest('.materiel-row');
-        if (!row) return;
-
-        const inputQuantite = row.querySelector('.quantite');
-        const inputPrixUnitaire = row.querySelector('.prix-unitaire');
-        const inputPrixGlobal = row.querySelector('.prix-global');
-
-        // Récupère les valeurs numériques
-        const quantite = parseFloat(inputQuantite.value) || 0;
-        const prixUnitaire = parseFloat(inputPrixUnitaire.value) || 0;
-
-        // Calcule le total
-        const prixGlobal = quantite * prixUnitaire;
-
-        // Affiche le résultat arrondi à 2 chiffres après la virgule
-        inputPrixGlobal.value = prixGlobal > 0 ? prixGlobal.toFixed(2) : '';
-    }
 });
 </script>
 

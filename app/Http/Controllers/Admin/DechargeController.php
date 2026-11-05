@@ -30,6 +30,7 @@ class DechargeController extends Controller
 
     /**
      * Enregistrer une nouvelle décharge.
+     * La signature se fait à la main après impression du PDF.
      */
     public function store(Request $request)
     {
@@ -45,7 +46,9 @@ class DechargeController extends Controller
             'role' => ['required', 'string', 'max:255'],
             'entreprise' => ['nullable', 'string', 'max:255'],
             'numero' => ['required', 'string', 'max:50'],
-            'email' => ['required', 'email', 'max:255'],
+
+            // E-mail facultatif
+            'email' => ['nullable', 'email', 'max:255'],
 
             // Type de décharge
             'type' => [
@@ -74,14 +77,14 @@ class DechargeController extends Controller
                 'max:50',
             ],
 
+            // E-mail du livreur facultatif
             'fournisseur_email' => [
-                'required_if:type,materiel',
                 'nullable',
                 'email',
                 'max:255',
             ],
 
-            // Décharge d'argent
+            // Décharge d'argent (remise de fonds ou salaire)
             'somme' => [
                 'required_if:type,argent',
                 'nullable',
@@ -144,13 +147,6 @@ class DechargeController extends Controller
                 'nullable',
                 'in:neuf,partiellement_utilise,vieux,defectueux',
             ],
-
-            // Signature numérique
-            'signature_data' => [
-                'required',
-                'string',
-                'regex:/^data:image\/png;base64,/',
-            ],
         ]);
 
         $type = $validated['type'];
@@ -202,7 +198,10 @@ class DechargeController extends Controller
                         : null,
 
                     'numero' => trim($validated['numero']),
-                    'email' => strtolower(trim($validated['email'])),
+
+                    'email' => !empty($validated['email'])
+                        ? strtolower(trim($validated['email']))
+                        : null,
 
                     // Informations du fournisseur
                     'fournisseur_nom' => $type === 'materiel'
@@ -221,7 +220,7 @@ class DechargeController extends Controller
                         ? trim($validated['fournisseur_numero'])
                         : null,
 
-                    'fournisseur_email' => $type === 'materiel'
+                    'fournisseur_email' => ($type === 'materiel' && !empty($validated['fournisseur_email']))
                         ? strtolower(trim($validated['fournisseur_email']))
                         : null,
 
@@ -241,9 +240,6 @@ class DechargeController extends Controller
                     'description' => $type === 'responsabilite'
                         ? ($validated['description'] ?? null)
                         : null,
-
-                    // Signature
-                    'signature_data' => $validated['signature_data'],
                 ]);
 
                 /*
@@ -338,13 +334,20 @@ class DechargeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | 6. Préparer les destinataires
+        | 6. Préparer les destinataires (e-mail facultatif)
         |--------------------------------------------------------------------------
+        | - Matériel : le livreur, s'il a une adresse.
+        | - Autres types : le bénéficiaire, s'il a une adresse.
+        | - La copie à l'administrateur est conservée dans tous les cas.
         */
 
         $emailPrincipal = $type === 'materiel'
             ? $decharge->fournisseur_email
             : $decharge->email;
+
+        $emailPrincipal = (is_string($emailPrincipal) && trim($emailPrincipal) !== '')
+            ? strtolower(trim($emailPrincipal))
+            : null;
 
         $destinataires = collect([
             $emailPrincipal,
@@ -403,14 +406,15 @@ class DechargeController extends Controller
                 );
         }
 
+        $message = 'La décharge ' . $decharge->reference . ' a été enregistrée';
+
+        $message .= $emailPrincipal
+            ? ' et transmise par e-mail.'
+            : '. Aucune adresse e-mail renseignée : imprimez le PDF et faites-le signer à la main.';
+
         return redirect()
             ->back()
-            ->with(
-                'success',
-                'La décharge '
-                . $decharge->reference
-                . ' a été enregistrée et transmise par e-mail.'
-            );
+            ->with('success', $message);
     }
 
     /**
