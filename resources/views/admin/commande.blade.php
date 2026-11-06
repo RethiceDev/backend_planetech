@@ -117,7 +117,7 @@
                 method="GET"
                 action="{{ url()->current() }}"
                 class="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm"
-            >
+             >
                 <input type="hidden" name="statut" id="statutFiltre" value="{{ $statut }}">
 
                 <div class="flex flex-col gap-4 xl:flex-row xl:items-center">
@@ -208,7 +208,6 @@
                 <div class="overflow-x-auto">
 
                     <table class="w-full min-w-[1100px]">
-
                         <thead>
                             <tr class="border-b border-gray-100 bg-gray-50">
                                 <th class="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500">Commande</th>
@@ -326,32 +325,62 @@
                                 </td>
 
                                 <td class="px-6 py-4 text-right">
-    <div class="inline-flex items-center gap-2">
+                                    <div class="inline-flex items-center gap-2 justify-end">
 
-        @if($proformaDispo)
-            <a
-                href="{{ route('commande.proforma', $commande) }}"
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Voir la proforma"
-                class="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100"
-            >
-                <i data-lucide="file-text" class="h-4 w-4"></i>
-                Proforma
-            </a>
-        @endif
+                                        @if(!$proformaDispo)
+                                            {{-- Commande nouvelle / non chiffrée : invitation à chiffrer et voir l'état initial --}}
+                                            <a
+                                                href="{{ route('commandes.show', $commande->id) }}"
+                                                class="inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 transition hover:bg-amber-100"
+                                            >
+                                                <i data-lucide="clock" class="h-4 w-4"></i>
+                                                Etablissez la proforma
+                                            </a>
+                                        @else
+                                            {{-- Proforma disponible : accès au document et au suivi du BC/Livraisons --}}
+                                            <a
+                                                href="{{ route('commande.proforma', $commande) }}"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                title="Voir la proforma"
+                                                class="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100"
+                                            >
+                                                <i data-lucide="file-text" class="h-4 w-4"></i>
+                                                Proforma
+                                            </a>
 
-        <button
-            type="button"
-            onclick="ouvrirCommande({{ $commande->id }})"
-            class="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-800"
-        >
-            <i data-lucide="eye" class="h-4 w-4"></i>
-            {{ $devisEnvoye ? 'Voir' : 'Chiffrer' }}
-        </button>
+                                            @if(empty($commande->numero_bc))
+                                                <a
+                                                    href="{{ route('commandes.show', $commande->id) }}#section-bc"
+                                                    title="Enregistrer le Bon de Commande officiel"
+                                                    class="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100"
+                                                >
+                                                    <i data-lucide="check-circle" class="h-4 w-4"></i>
+                                                    Enregistrer le BC
+                                                </a>
+                                            @endif
 
-    </div>
-</td>
+                                            <a
+                                                href="{{ route('commandes.show', $commande->id) }}"
+                                                title="Voir le niveau d'avancement de la commande"
+                                                class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200"
+                                            >
+                                                <i data-lucide="activity" class="h-4 w-4 text-slate-500"></i>
+                                                Avancement
+                                            </a>
+                                        @endif
+
+                                        <button
+                                            type="button"
+                                            onclick="ouvrirCommande({{ $commande->id }})"
+                                            class="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-800"
+                                        >
+                                            <i data-lucide="eye" class="h-4 w-4"></i>
+                                            {{ $devisEnvoye ? 'Voir' : 'Chiffrer' }}
+                                        </button>
+
+                                    </div>
+                                </td>
 
                             </tr>
 
@@ -359,34 +388,19 @@
 
                             <tr>
                                 <td colspan="7" class="px-6 py-16 text-center">
-
                                     <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
                                         <i data-lucide="shopping-bag" class="h-6 w-6 text-slate-400"></i>
                                     </div>
-
                                     <p class="mt-4 text-sm font-semibold text-slate-700">Aucune commande</p>
-
                                     <p class="mt-1 text-xs text-slate-400">
                                         Aucune commande ne correspond à vos critères.
                                     </p>
-
-                                    @if($recherche || $statut !== 'toutes')
-                                        <a
-                                            href="{{ url()->current() }}"
-                                            class="mt-4 inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-800"
-                                        >
-                                            <i data-lucide="rotate-ccw" class="h-4 w-4"></i>
-                                            Réinitialiser les filtres
-                                        </a>
-                                    @endif
-
                                 </td>
                             </tr>
 
                         @endforelse
 
                         </tbody>
-
                     </table>
 
                 </div>

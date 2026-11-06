@@ -10,17 +10,27 @@ class CommandeItem extends Model
     use HasFactory;
 
     protected $table = 'commande_items';
+// Dans App\Models\CommandeItem
 
     protected $fillable = [
-    'commande_id',
-    'product_id',
-    'designation',
-    'quantite',
-    'prix_unitaire',
-    'total_ligne',
-    'disponible',
-];
+        'commande_id',
+        'product_id',
+        'designation',
+        'quantite',
+        'quantite_livree',
+        'prix_unitaire',
+        'total_ligne',
+        'disponible',
+    ];
 
+    /**
+     * Accesseur pour obtenir automatiquement le reste à livrer (quantite - quantite_livree).
+     */
+    public function getQuantiteRestanteAttribute(): int
+    {
+        return max(0, (int) $this->quantite - (int) $this->quantite_livree);
+    }
+    
 protected $casts = [
     'prix_unitaire' => 'decimal:2',
     'total_ligne' => 'decimal:2',

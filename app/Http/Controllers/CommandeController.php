@@ -358,4 +358,66 @@ class CommandeController extends Controller
 
         return 'data:image/png;base64,' . base64_encode(file_get_contents($chemin));
     }
+
+    public function enregistrerBc(Request $request, Commande $commande)
+    {
+        $validated = $request->validate([
+            'numero_bc' => ['required', 'string', 'max:255'],
+            'date_bc' => ['required', 'date'],
+            'observation_bc' => ['nullable', 'string'],
+            'items' => ['required', 'array'],
+            'items.*.id' => ['required', 'exists:commande_items,id'],
+            'items.*.quantite' => ['required', 'integer', 'min:0'],
+        ]);
+
+        // 1. Mettre à jour les informations du BC
+        $commande->update([
+            'numero_bc' => $validated['numero_bc'],
+            'date_bc' => $validated['date_bc'],
+            'observation_bc' => $validated['observation_bc'] ?? null,
+            'statut' => 'en_cours',
+        ]);
+
+        // 2. Mettre à jour les quantités des articles validés par le client
+        $nouveauTotal = 0;
+        foreach ($validated['items'] as $itemData) {
+            $item = $commande->items()->find($itemData['id']);
+            if ($item) {
+                $nouvelleQuantite = $itemData['quantite'];
+                $item->update(['quantite' => $nouvelleQuantite]);
+
+                // Recalcul du montant total basé sur le prix unitaire
+                $nouveauTotal += ($item->prix_unitaire * $nouvelleQuantite);
+            }
+        }
+
+        // Mettre à jour le montant total de la commande après ajustement du client
+        $commande->update(['total' => $nouveauTotal]);
+
+        return redirect()->back()->with('success', 'Bon de commande et quantités ajustés avec succès.');
+    }
+
+    public function show(Commande $commande)
+    {
+        // Charger les relations nécessaires pour la vue du dossier
+        $commande->load(['items', 'livraisons.items.commandeItem']);
+
+        return view('commandes.show', compact('commande'));
+    }
+
+    public function cloturerDossier(Request $request, Commande $commande)
+    {
+        $validated = $request->validate([
+            'reference_facture' => ['required', 'string', 'max:255'],
+            'delai_paiement' => ['required', 'string', 'max:255'],
+        ]);
+
+        $commande->update([
+            'reference_facture' => $validated['reference_facture'],
+            'delai_paiement' => $validated['delai_paiement'],
+            'statut' => 'cloturee',
+        ]);
+
+        return redirect()->back()->with('success', 'Dossier clôturé avec succès.');
+    }
 }

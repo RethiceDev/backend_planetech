@@ -11,6 +11,8 @@ class Commande extends Model
 
     protected $table = 'commandes';
 
+    // Dans App\Models\Commande
+
     protected $fillable = [
         'reference',
         'type_client',
@@ -20,10 +22,23 @@ class Commande extends Model
         'telephone',
         'total',
         'statut',
+        'numero_bc',
+        'date_bc',
+        'observation_bc',
+        'reference_facture',
+        'delai_paiement',
     ];
 
+    /**
+     * Une commande peut avoir plusieurs bordereaux de livraison (partiels ou total).
+     */
+    public function livraisons()
+    {
+        return $this->hasMany(Livraison::class, 'commande_id');
+    }
     protected $casts = [
         'total' => 'decimal:2',
+        'date_bc' => 'date',
     ];
 
     /**
@@ -36,4 +51,5 @@ class Commande extends Model
             'commande_id'
         );
     }
+
 }

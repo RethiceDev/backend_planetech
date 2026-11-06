@@ -16,7 +16,22 @@ use App\Http\Controllers\SousCategorieController;
 use App\Http\Controllers\RegistreController;
 use App\Http\Controllers\Admin\DechargeController;
 use App\Http\Controllers\Admin\ProcurationController;
-use App\Http\Controllers\EntretienController;
+use App\Http\Controllers\LivraisonController;
+
+Route::post('/commandes/{commande}/cloturer', [CommandeController::class, 'cloturerDossier'])
+    ->name('commandes.cloturer');
+
+// 1. Affichage du dossier virtuel de la commande (Méthode GET)
+Route::get('/commandes/{commande}', [CommandeController::class, 'show'])
+    ->name('commandes.show');
+
+// 2. Traitement et enregistrement du Bon de Commande officiel (Méthode POST)
+Route::post('/commandes/{commande}/enregistrer-bc', [CommandeController::class, 'enregistrerBc'])
+    ->name('commandes.enregistrer-bc');
+
+// 3. Enregistrement d'une livraison (partielle ou totale) et génération du BL (Méthode POST)
+Route::post('/commandes/{commande}/livraisons', [LivraisonController::class, 'enregistrerLivraison'])
+    ->name('livraisons.store');
 
 Route::get('/admin/entretiens-du-jour/pdf', [RegistreController::class, 'pdfAujourdhui'])->name('admin.entretiens.jour.pdf');
 
