@@ -13,7 +13,7 @@ class ElectriciteGeneraleSeeder extends Seeder
         // 1. Création de la Catégorie Principale
         $electricite = Category::create([
             'nom' => 'Électricité Générale'
-        ]);
+        ]); 
 
         // 2. Création des 6 Sous-catégories associées
         $sousCategories = [

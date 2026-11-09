@@ -14,13 +14,13 @@ class DatabaseSeeder extends Seeder
      * Seed the application's database.
      */
     public function run(): void
-    {
+    { 
         $this->call([
             ElectriciteGeneraleSeeder::class,
             Informatiqueseeder::class,
             Reseauxtelecomsseeder::class,
             ClimatisationSeeder::class,
             SecuriteBatimentSeeder::class,
-        ]); 
+        ]);
     }
 }

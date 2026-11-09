@@ -30,9 +30,9 @@ class ReseauxTelecomsSeeder extends Seeder
 
         foreach ($sousCategories as $nom) {
             SousCategorie::firstOrCreate([
-                'category_id' => $reseaux->id,
+                'category_id' => $reseaux->id, 
                 'nom'         => $nom,
             ]);
         }
-    } 
+    }
 }

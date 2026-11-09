@@ -19,7 +19,7 @@ class InformatiqueSeeder extends Seeder
         ]);
 
         // 2. Liste complète des sous-catégories
-        $sousCategories = [
+        $sousCategories = [ 
             'Ordinateurs Portables et PC de Bureau',
             'Écrans et Périphériques',
             'Composants Informatiques',

@@ -22,7 +22,7 @@ class ClimatisationSeeder extends Seeder
             'Chambres Froides (Positives & Négatives)',
             'Compresseurs Frigorifiques',
             'Tubes et Isolants Cuivre',
-            'Gaz Réfrigérants (R410A, R32, R134a)',
+            'Gaz Réfrigérants (R410A, R32, R134a)', 
             'Pièces Détachées & Accessoires'
         ];
 
