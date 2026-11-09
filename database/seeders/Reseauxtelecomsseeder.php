@@ -34,5 +34,5 @@ class ReseauxTelecomsSeeder extends Seeder
                 'nom'         => $nom,
             ]);
         }
-    }
+    } 
 }
