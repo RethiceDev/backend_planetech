@@ -40,26 +40,32 @@ class ScrapeOrdinateursProTechCommand extends Command
             $this->info("Scraping de la page {$page} : {$url}");
 
             $response = Http::withHeaders([
-                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language' => 'fr-FR,fr;q=0.9,en-US;q=0.3',
             ])->get($url);
 
+            $this->info(" -> Code HTTP reçu : " . $response->status());
+
             if ($response->failed()) {
-                $this->warn(" -> Impossible d'accéder à la page {$page} (Code: " . $response->status() . ").");
+                $this->warn(" -> Impossible d'accéder à la page {$page}.");
                 break;
             }
 
             $crawler = new Crawler($response->body());
-            $products = $crawler->filter('li.product, .product-item, .item-product, article.product');
+
+            // Élargissement des sélecteurs pour thèmes WooCommerce / Elementor
+            $products = $crawler->filter('li.product, .product-grid-item, .woo-product-item, .elementor-grid-item, .product');
             $this->info(" -> Produits détectés sur cette page : " . $products->count());
 
             if ($products->count() === 0) {
-                $this->line(" -> Aucun produit trouvé sur cette page.");
+                $this->line(" -> Aucun produit trouvé. Extrait HTML : " . substr(strip_tags($response->body()), 0, 200));
                 break;
             }
 
             $products->each(function (Crawler $node) use ($sousCategorie) {
                 try {
-                    $nomNode = $node->filter('.woocommerce-loop-product__title, h2, h3, .product-title a, a.woocommerce-LoopProduct-link');
+                    $nomNode = $node->filter('.woocommerce-loop-product__title, h2, h3, .product-title a, a.woocommerce-LoopProduct-link, .elementor-heading-title');
                     if ($nomNode->count() === 0) return;
                     $name = trim($nomNode->text());
                     if (empty($name)) return;
