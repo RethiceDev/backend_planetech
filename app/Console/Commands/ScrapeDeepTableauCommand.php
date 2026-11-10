@@ -125,10 +125,17 @@ class ScrapeDeepTableauCommand extends Command
                     $this->line("   ➔ Produit : <fg=cyan>{$productName}</>");
                     $this->line("      Rangé dans : <fg=green;options=bold>[Électricité Générale ➔ {$sousCatName}]</> <fg=gray>(Règle: {$matchedRule})</>");
 
+                    // Extraction robuste de l'image
                     $imageUrl = null;
-                    $imgNode = $pCrawler->filter('.woocommerce-product-gallery__image img, .product-images img, .attachment-shop_single img');
+                    $imgNode = $pCrawler->filter('.woocommerce-product-gallery__image img, .wp-post-image, .product-images img, div.images img');
                     if ($imgNode->count() > 0) {
-                        $imageUrl = $imgNode->attr('data-large_image') ?? $imgNode->attr('data-src') ?? $imgNode->attr('src');
+                        foreach (['data-large_image', 'data-src', 'data-lazy-src', 'src'] as $attr) {
+                            $val = $imgNode->first()->attr($attr);
+                            if ($val && !str_starts_with($val, 'data:image') && !str_contains($val, 'placeholder')) {
+                                $imageUrl = $val;
+                                break;
+                            }
+                        }
                     }
                     $localImagePath = $this->downloadImage($imageUrl, $productName);
 
@@ -197,9 +204,9 @@ class ScrapeDeepTableauCommand extends Command
             if (str_starts_with($url, '//')) $url = 'https:' . $url;
             $body = Http::timeout(10)->get($url)->body();
             if (!empty($body)) {
-                $name = 'produits/' . Str::slug($title) . '-' . time() . '.jpg';
-                Storage::disk('public')->put($name, $body);
-                return $name;
+                $filename = Str::slug($title) . '-' . time() . '.jpg';
+                Storage::disk('public')->put('products/' . $filename, $body);
+                return 'storage/products/' . $filename;
             }
         } catch (\Exception $e) {}
         return null;
