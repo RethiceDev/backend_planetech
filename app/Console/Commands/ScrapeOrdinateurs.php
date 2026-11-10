@@ -59,16 +59,21 @@ class ScrapeOrdinateurs extends Command
                     if ($nomNode->count() === 0) return;
                     $name = trim($nomNode->text());
 
-                    // Extraction robuste de l'image (tous les formats WooCommerce possibles)
+                    // Extraction robuste de l'image (priorité aux attributs data et srcset)
                     $imgNode = $node->filter('img');
                     $imageUrl = null;
                     if ($imgNode->count() > 0) {
-                        $imageUrl = $imgNode->attr('data-lazy-src')
-                                 ?? $imgNode->attr('data-src')
-                                 ?? $imgNode->attr('srcset')
-                                 ?? $imgNode->attr('src');
+                        foreach (['data-lazy-src', 'data-src', 'data-large_image', 'srcset', 'src'] as $attr) {
+                            if ($imgNode->filter("[$attr]")->count() > 0) {
+                                $val = $imgNode->attr($attr);
+                                if ($val && !str_contains($val, 'data:image') && !str_contains($val, 'placeholder')) {
+                                    $imageUrl = $val;
+                                    break;
+                                }
+                            }
+                        }
 
-                        // Nettoyage si srcset retourne plusieurs URLs
+                        // Si l'URL trouvée vient de srcset, on prend la première URL valide
                         if ($imageUrl && str_contains($imageUrl, ',')) {
                             $parts = explode(',', $imageUrl);
                             $imageUrl = trim(explode(' ', trim($parts[0]))[0]);
@@ -92,7 +97,7 @@ class ScrapeOrdinateurs extends Command
                         ]
                     );
 
-                    $this->line("-> Importé : {$name} [Photo: " . ($imageUrl ? 'OK' : 'ABSENTE') . "]");
+                    $this->line("-> Importé : {$name} [Photo: " . ($imageUrl ? $imageUrl : 'ABSENTE') . "]");
                 } catch (\Exception $e) {
                     $this->error("Erreur sur un produit : " . $e->getMessage());
                 }
