@@ -54,48 +54,49 @@ class ScrapeOrdinateurs extends Command
             }
 
             $products->each(function (Crawler $node) use ($sousCategorie) {
-    try {
-        $nomNode = $node->filter('.woocommerce-loop-product__title, h2, h3');
-        if ($nomNode->count() === 0) return;
-        $name = trim($nomNode->text());
+                try {
+                    $nomNode = $node->filter('.woocommerce-loop-product__title, h2, h3');
+                    if ($nomNode->count() === 0) return;
+                    $name = trim($nomNode->text());
 
-        // Extraction robuste de l'image (cherche data-lazy-src, data-src, srcset ou src)
-        $imgNode = $node->filter('img');
-        $imageUrl = null;
-        if ($imgNode->count() > 0) {
-            $imageUrl = $imgNode->attr('data-lazy-src')
-                     ?? $imgNode->attr('data-src')
-                     ?? $imgNode->attr('src');
+                    // Extraction robuste de l'image (tous les formats WooCommerce possibles)
+                    $imgNode = $node->filter('img');
+                    $imageUrl = null;
+                    if ($imgNode->count() > 0) {
+                        $imageUrl = $imgNode->attr('data-lazy-src')
+                                 ?? $imgNode->attr('data-src')
+                                 ?? $imgNode->attr('srcset')
+                                 ?? $imgNode->attr('src');
 
-            // Si l'attribut srcset est présent et qu'il n'y a pas d'autre source, on prend le premier lien
-            if (!$imageUrl && $imgNode->attr('srcset')) {
-                $srcset = explode(',', $imgNode->attr('srcset'));
-                $imageUrl = trim(explode(' ', trim($srcset[0]))[0]);
-            }
-        }
+                        // Nettoyage si srcset retourne plusieurs URLs
+                        if ($imageUrl && str_contains($imageUrl, ',')) {
+                            $parts = explode(',', $imageUrl);
+                            $imageUrl = trim(explode(' ', trim($parts[0]))[0]);
+                        }
+                    }
 
-        $descNode = $node->filter('.short-description, .product-details, p');
-        $description = $descNode->count() > 0 ? trim($descNode->text()) : "Ordinateur portable ou PC de bureau disponible sur devis.";
+                    $descNode = $node->filter('.short-description, .product-details, p');
+                    $description = $descNode->count() > 0 ? trim($descNode->text()) : "Ordinateur portable ou PC de bureau disponible sur devis.";
 
-        Product::firstOrCreate(
-            [
-                'sous_categorie_id' => $sousCategorie->id,
-                'name' => $name
-            ],
-            [
-                'price' => null,
-                'photo' => $imageUrl, // Enregistre le lien de l'image trouvé
-                'description' => $description,
-                'created_at' => now(),
-                'updated_at' => now()
-            ]
-        );
+                    Product::firstOrCreate(
+                        [
+                            'sous_categorie_id' => $sousCategorie->id,
+                            'name' => $name
+                        ],
+                        [
+                            'price' => null,
+                            'photo' => $imageUrl,
+                            'description' => $description,
+                            'created_at' => now(),
+                            'updated_at' => now()
+                        ]
+                    );
 
-        $this->line("-> Importé avec photo : {$name}");
-    } catch (\Exception $e) {
-        $this->error("Erreur sur un produit ({$name}): " . $e->getMessage());
-    }
-});
+                    $this->line("-> Importé : {$name} [Photo: " . ($imageUrl ? 'OK' : 'ABSENTE') . "]");
+                } catch (\Exception $e) {
+                    $this->error("Erreur sur un produit : " . $e->getMessage());
+                }
+            });
 
             $nextPage = $crawler->filter('a.next.page-numbers');
             if ($nextPage->count() === 0 || $page >= 11) {
