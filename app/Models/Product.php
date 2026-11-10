@@ -52,7 +52,7 @@ class Product extends Model
             'id',
             'id',
             'sous_categorie_id',
-            'category_id'
+            'category_id'  
         );
     }
 }
