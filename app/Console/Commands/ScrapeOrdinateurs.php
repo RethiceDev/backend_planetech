@@ -8,11 +8,13 @@ use App\Models\SousCategorie;
 use App\Models\Product;
 use Symfony\Component\DomCrawler\Crawler;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class ScrapeOrdinateurs extends Command
 {
     protected $signature = 'scrape:ordinateurs';
-    protected $description = 'Scrape les ordinateurs depuis Togo Informatique';
+    protected $description = 'Scrape les ordinateurs et télécharge leurs images localement';
 
     public function handle()
     {
@@ -59,6 +61,7 @@ class ScrapeOrdinateurs extends Command
                     if ($nomNode->count() === 0) return;
                     $name = trim($nomNode->text());
 
+                    // 1. Extraction de l'URL distante de l'image
                     $imgNode = $node->filter('.woocommerce-loop-product__link img, .attachment-woocommerce_thumbnail, img');
                     $imageUrl = null;
                     if ($imgNode->count() > 0) {
@@ -71,9 +74,29 @@ class ScrapeOrdinateurs extends Command
                         }
                     }
 
+                    // 2. Téléchargement de l'image sur le serveur local si l'URL existe
+                    $localImagePath = null;
+                    if ($imageUrl) {
+                        try {
+                            $imageContent = Http::timeout(10)->withHeaders([
+                                'User-Agent' => 'Mozilla/5.0'
+                            ])->get($imageUrl)->body();
+
+                            if (!empty($imageContent)) {
+                                $imageName = Str::slug($name) . '-' . time() . '.jpg';
+                                // Enregistre dans public/storage/products (nécessite d'avoir fait php artisan storage:link)
+                                Storage::disk('public')->put('products/' . $imageName, $imageContent);
+                                $localImagePath = 'storage/products/' . $imageName;
+                            }
+                        } catch (\Exception $ex) {
+                            // Ignore si le téléchargement échoue pour ne pas bloquer l'insertion
+                        }
+                    }
+
                     $descNode = $node->filter('.short-description, .product-details, p');
                     $description = $descNode->count() > 0 ? trim($descNode->text()) : "Ordinateur portable ou PC de bureau disponible sur devis.";
 
+                    // 3. Enregistrement en base avec le chemin local
                     Product::firstOrCreate(
                         [
                             'sous_categorie_id' => $sousCategorie->id,
@@ -81,14 +104,14 @@ class ScrapeOrdinateurs extends Command
                         ],
                         [
                             'price' => null,
-                            'photo' => $imageUrl,
+                            'photo' => $localImagePath, // Stocke le chemin local de l'image
                             'description' => $description,
                             'created_at' => now(),
                             'updated_at' => now()
                         ]
                     );
 
-                    $this->line("-> Importé : {$name} [Photo: " . ($imageUrl ? 'OK' : 'ABSENTE') . "]");
+                    $this->line("-> Importé : {$name} [Image locale: " . ($localImagePath ? 'OK' : 'ABSENTE') . "]");
                 } catch (\Exception $e) {
                     $this->error("Erreur sur un produit : " . $e->getMessage());
                 }
@@ -102,6 +125,6 @@ class ScrapeOrdinateurs extends Command
             }
         }
 
-        $this->info("Scraping des ordinateurs terminé avec succès !");
+        $this->info("Scraping et téléchargement des images terminés !");
     }
 }
