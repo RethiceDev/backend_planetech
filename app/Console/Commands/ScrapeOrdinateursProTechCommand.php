@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
 class ScrapeOrdinateursProTechCommand extends Command
 {
     protected $signature = 'scrape:ordinateurs-protech';
-    protected $description = 'Scrape les ordinateurs portables et de bureau depuis ProTech Togo';
+    protected $description = 'Scrape les ordinateurs portables et de bureau depuis ProTech Togo avec pagination forcée';
 
     public function handle()
     {
@@ -32,10 +32,9 @@ class ScrapeOrdinateursProTechCommand extends Command
         ]);
 
         $baseUrl = 'https://protechtogo.com/product-category/ordinateurs-pc/';
-        $page = 1;
-        $hasMorePages = true;
 
-        while ($hasMorePages) {
+        // Boucle explicite sur 10 pages maximum (ajustable si besoin)
+        for ($page = 1; $page <= 10; $page++) {
             $url = $page === 1 ? $baseUrl : $baseUrl . 'page/' . $page . '/';
             $this->info("Scraping de la page {$page} : {$url}");
 
@@ -45,10 +44,9 @@ class ScrapeOrdinateursProTechCommand extends Command
                 'Accept-Language' => 'fr-FR,fr;q=0.9,en-US;q=0.3',
             ])->get($url);
 
-            $this->info(" -> Code HTTP reçu : " . $response->status());
-
+            // Si la page renvoie une erreur 404 ou autre, c'est qu'on a dépassé la dernière page
             if ($response->failed()) {
-                $this->warn(" -> Impossible d'accéder à la page {$page}.");
+                $this->warn(" -> Fin de pagination atteinte (Code HTTP : " . $response->status() . ").");
                 break;
             }
 
@@ -58,8 +56,9 @@ class ScrapeOrdinateursProTechCommand extends Command
             $products = $crawler->filter('li.product, .product-grid-item, .woo-product-item, .elementor-grid-item, .product');
             $this->info(" -> Produits détectés sur cette page : " . $products->count());
 
+            // Si aucun produit n'est trouvé sur la page, on stoppe la boucle
             if ($products->count() === 0) {
-                $this->line(" -> Aucun produit trouvé. Extrait HTML : " . substr(strip_tags($response->body()), 0, 200));
+                $this->line(" -> Aucun produit supplémentaire. Fin du parcours.");
                 break;
             }
 
@@ -124,16 +123,8 @@ class ScrapeOrdinateursProTechCommand extends Command
                     $this->error("    -> Erreur insertion produit : " . $e->getMessage());
                 }
             });
-
-            // Gestion de la pagination WooCommerce
-            $nextPage = $crawler->filter('a.next.page-numbers');
-            if ($nextPage->count() === 0 || $page >= 10) {
-                $hasMorePages = false;
-            } else {
-                $page++;
-            }
         }
 
-        $this->info("Scraping des ordinateurs ProTech terminé avec succès !");
+        $this->info("Scraping de toutes les pages d'ordinateurs ProTech terminé avec succès !");
     }
 }
