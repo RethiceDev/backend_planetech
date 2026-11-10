@@ -20,12 +20,10 @@ class ScrapeTonersCartouchesProTechCommand extends Command
     {
         $this->info("Début du scraping des toners et cartouches depuis ProTech Togo...");
 
-        // 1. Récupération de la catégorie principale
         $informatique = Category::firstOrCreate([
             'nom' => 'Informatique et Bureautique'
         ]);
 
-        // 2. Ciblage de la sous-catégorie d'impression et consommables
         $sousCategorie = SousCategorie::firstOrCreate([
             'category_id' => $informatique->id,
             'nom' => 'Impression et Consommables'
@@ -33,7 +31,6 @@ class ScrapeTonersCartouchesProTechCommand extends Command
 
         $baseUrl = 'https://protechtogo.com/product-category/toners-cartouches/';
 
-        // Boucle explicite sur 10 pages maximum
         for ($page = 1; $page <= 10; $page++) {
             $url = $page === 1 ? $baseUrl : $baseUrl . 'page/' . $page . '/';
             $this->info("Scraping de la page {$page} : {$url}");
@@ -50,8 +47,6 @@ class ScrapeTonersCartouchesProTechCommand extends Command
             }
 
             $crawler = new Crawler($response->body());
-
-            // Élargissement des sélecteurs pour thèmes WooCommerce / Elementor
             $products = $crawler->filter('li.product, .product-grid-item, .woo-product-item, .elementor-grid-item, .product');
             $this->info(" -> Produits détectés sur cette page : " . $products->count());
 
@@ -67,7 +62,6 @@ class ScrapeTonersCartouchesProTechCommand extends Command
                     $name = trim($nomNode->text());
                     if (empty($name)) return;
 
-                    // Extraction de l'URL de l'image
                     $imgNode = $node->filter('img');
                     $imageUrl = null;
                     if ($imgNode->count() > 0) {
@@ -80,7 +74,6 @@ class ScrapeTonersCartouchesProTechCommand extends Command
                         }
                     }
 
-                    // Téléchargement local de l'image
                     $localImagePath = null;
                     if ($imageUrl) {
                         try {
@@ -93,15 +86,12 @@ class ScrapeTonersCartouchesProTechCommand extends Command
                                 Storage::disk('public')->put('products/' . $imageName, $responseImg->body());
                                 $localImagePath = 'storage/products/' . $imageName;
                             }
-                        } catch (\Exception $ex) {
-                            // Ignorer l'erreur d'image
-                        }
+                        } catch (\Exception $ex) {}
                     }
 
                     $descNode = $node->filter('.short-description, .product-details, p');
-                    $description = $descNode->count() > 0 ? trim($descNode$descNode->text()) : "Toner ou cartouche disponible sur devis.";
+                    $description = $descNode->count() > 0 ? trim($descNode->text()) : "Toner ou cartouche disponible sur devis.";
 
-                    // Enregistrement en base de données
                     Product::firstOrCreate(
                         [
                             'sous_categorie_id' => $sousCategorie->id,
