@@ -112,7 +112,7 @@ class ScrapeTousConsommablesTogoCommand extends Command
                         }
 
                         $descNode = $node->filter('.short-description, .product-details, p');
-                        $description = $descNode->count() > 0 ? trim($descNode$descNode->text()) : "Consommable d'impression disponible sur devis.";
+                        $description = $descNode->count() > 0 ? trim($descNode->text()) : "Consommable d'impression disponible sur devis.";
 
                         // Enregistrement en base de données
                         Product::firstOrCreate(
@@ -137,7 +137,7 @@ class ScrapeTousConsommablesTogoCommand extends Command
 
                 // Gestion de la pagination WooCommerce
                 $nextPage = $crawler->filter('a.next.page-numbers');
-                if ($nextPage->count() === 0 || $page >= 10) {
+                if ($nextPage->count() === 0 ||$page >= 10) {
                     $hasMorePages = false;
                 } else {
                     $page++;
