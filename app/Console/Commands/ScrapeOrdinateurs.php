@@ -54,40 +54,48 @@ class ScrapeOrdinateurs extends Command
             }
 
             $products->each(function (Crawler $node) use ($sousCategorie) {
-                try {
-                    // Nom du produit
-                    $nomNode = $node->filter('.woocommerce-loop-product__title, h2, h3');
-                    if ($nomNode->count() === 0) return;
-                    $name = trim($nomNode->text());
+    try {
+        $nomNode = $node->filter('.woocommerce-loop-product__title, h2, h3');
+        if ($nomNode->count() === 0) return;
+        $name = trim($nomNode->text());
 
-                    // Image du produit
-                    $imgNode = $node->filter('img');
-                    $imageUrl = $imgNode->count() > 0 ? ($imgNode->attr('data-src') ?? $imgNode->attr('src')) : null;
+        // Extraction robuste de l'image (cherche data-lazy-src, data-src, srcset ou src)
+        $imgNode = $node->filter('img');
+        $imageUrl = null;
+        if ($imgNode->count() > 0) {
+            $imageUrl = $imgNode->attr('data-lazy-src')
+                     ?? $imgNode->attr('data-src')
+                     ?? $imgNode->attr('src');
 
-                    // Récupération d'une description courte si elle existe sur la carte, sinon texte par défaut
-                    $descNode = $node->filter('.short-description, .product-details, p');
-                    $description = $descNode->count() > 0 ? trim($descNode->text()) : "Ordinateur portable ou PC de bureau disponible sur devis.";
+            // Si l'attribut srcset est présent et qu'il n'y a pas d'autre source, on prend le premier lien
+            if (!$imageUrl && $imgNode->attr('srcset')) {
+                $srcset = explode(',', $imgNode->attr('srcset'));
+                $imageUrl = trim(explode(' ', trim($srcset[0]))[0]);
+            }
+        }
 
-                    // Enregistrement sécurisé avec gestion des champs obligatoires
-                    Product::firstOrCreate(
-                        [
-                            'sous_categorie_id' => $sousCategorie->id,
-                            'name' => $name
-                        ],
-                        [
-                            'price' => null,
-                            'photo' => $imageUrl,
-                            'description' => $description,
-                            'created_at' => now(),
-                            'updated_at' => now()
-                        ]
-                    );
+        $descNode = $node->filter('.short-description, .product-details, p');
+        $description = $descNode->count() > 0 ? trim($descNode->text()) : "Ordinateur portable ou PC de bureau disponible sur devis.";
 
-                    $this->line("-> Importé : {$name}");
-                } catch (\Exception $e) {
-                    $this->error("Erreur sur un produit ({$name}): " . $e->getMessage());
-                }
-            });
+        Product::firstOrCreate(
+            [
+                'sous_categorie_id' => $sousCategorie->id,
+                'name' => $name
+            ],
+            [
+                'price' => null,
+                'photo' => $imageUrl, // Enregistre le lien de l'image trouvé
+                'description' => $description,
+                'created_at' => now(),
+                'updated_at' => now()
+            ]
+        );
+
+        $this->line("-> Importé avec photo : {$name}");
+    } catch (\Exception $e) {
+        $this->error("Erreur sur un produit ({$name}): " . $e->getMessage());
+    }
+});
 
             $nextPage = $crawler->filter('a.next.page-numbers');
             if ($nextPage->count() === 0 || $page >= 11) {
