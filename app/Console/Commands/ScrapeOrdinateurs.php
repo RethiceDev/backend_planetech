@@ -59,24 +59,15 @@ class ScrapeOrdinateurs extends Command
                     if ($nomNode->count() === 0) return;
                     $name = trim($nomNode->text());
 
-                    // Extraction robuste de l'image (priorité aux attributs data et srcset)
-                    $imgNode = $node->filter('img');
+                    $imgNode = $node->filter('.woocommerce-loop-product__link img, .attachment-woocommerce_thumbnail, img');
                     $imageUrl = null;
                     if ($imgNode->count() > 0) {
-                        foreach (['data-lazy-src', 'data-src', 'data-large_image', 'srcset', 'src'] as $attr) {
-                            if ($imgNode->filter("[$attr]")->count() > 0) {
-                                $val = $imgNode->attr($attr);
-                                if ($val && !str_contains($val, 'data:image') && !str_contains($val, 'placeholder')) {
-                                    $imageUrl = $val;
-                                    break;
-                                }
+                        foreach (['data-lazy-src', 'data-src', 'data-large_image', 'src'] as $attr) {
+                            $val = $imgNode->attr($attr);
+                            if ($val && !str_starts_with($val, 'data:image') && !str_contains($val, 'placeholder')) {
+                                $imageUrl = $val;
+                                break;
                             }
-                        }
-
-                        // Si l'URL trouvée vient de srcset, on prend la première URL valide
-                        if ($imageUrl && str_contains($imageUrl, ',')) {
-                            $parts = explode(',', $imageUrl);
-                            $imageUrl = trim(explode(' ', trim($parts[0]))[0]);
                         }
                     }
 
@@ -97,7 +88,7 @@ class ScrapeOrdinateurs extends Command
                         ]
                     );
 
-                    $this->line("-> Importé : {$name} [Photo: " . ($imageUrl ? $imageUrl : 'ABSENTE') . "]");
+                    $this->line("-> Importé : {$name} [Photo: " . ($imageUrl ? 'OK' : 'ABSENTE') . "]");
                 } catch (\Exception $e) {
                     $this->error("Erreur sur un produit : " . $e->getMessage());
                 }
