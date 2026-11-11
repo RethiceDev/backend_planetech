@@ -125,9 +125,9 @@ class ScrapeDeepTableauCommand extends Command
                     $this->line("   ➔ Produit : <fg=cyan>{$productName}</>");
                     $this->line("      Rangé dans : <fg=green;options=bold>[Électricité Générale ➔ {$sousCatName}]</> <fg=gray>(Règle: {$matchedRule})</>");
 
-                    // Extraction robuste de l'image
+                    // Extraction ultra-robuste de l'image (Cible les classes WooCommerce et génériques)
                     $imageUrl = null;
-                    $imgNode = $pCrawler->filter('.woocommerce-product-gallery__image img, .wp-post-image, .product-images img, div.images img');
+                    $imgNode = $pCrawler->filter('.woocommerce-product-gallery__image img, .wp-post-image, .product-main-image img, div.images img, .attachment-shop_single');
                     if ($imgNode->count() > 0) {
                         foreach (['data-large_image', 'data-src', 'data-lazy-src', 'src'] as $attr) {
                             $val = $imgNode->first()->attr($attr);
@@ -137,6 +137,21 @@ class ScrapeDeepTableauCommand extends Command
                             }
                         }
                     }
+
+                    // Fallback de secours si aucun attribut spécifique n'est trouvé
+                    if (!$imageUrl) {
+                        $genericImg = $pCrawler->filter('.product img, main img');
+                        if ($genericImg->count() > 0) {
+                            foreach (['src', 'data-src', 'data-lazy-src'] as $attr) {
+                                $val = $genericImg->first()->attr($attr);
+                                if ($val && !str_starts_with($val, 'data:image') && !str_contains($val, 'placeholder')) {
+                                    $imageUrl = $val;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
                     $localImagePath = $this->downloadImage($imageUrl, $productName);
 
                     Product::updateOrCreate(
