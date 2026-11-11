@@ -12,5 +12,6 @@ class Entretien extends Model
         'nom',
         'prenoms',
         'poste',
+        'telephone'
     ];
 }

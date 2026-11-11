@@ -17,6 +17,9 @@ use App\Http\Controllers\RegistreController;
 use App\Http\Controllers\Admin\DechargeController;
 use App\Http\Controllers\Admin\ProcurationController;
 use App\Http\Controllers\LivraisonController;
+use App\Http\Controllers\EntretienController;
+
+Route::get('/entretiens/tous/pdf', [EntretienController::class, 'tousPdf'])->name('admin.entretiens.tous.pdf');
 
 Route::post('/commandes/{commande}/cloturer', [CommandeController::class, 'cloturerDossier'])
     ->name('commandes.cloturer');
@@ -43,7 +46,7 @@ Route::get('/historique-des-entretiens', [EntretienController::class, 'index'])-
 | AUTHENTIFICATION ADMINISTRATEUR
 |--------------------------------------------------------------------------
 */
-
+Route::get('/entretiens/tous', [EntretienController::class, 'tous'])->name('admin.entretiens.tous');
 
 Route::get('/commande/{commande}/proforma', [CommandeController::class, 'voirProforma'])
     ->name('commande.proforma');

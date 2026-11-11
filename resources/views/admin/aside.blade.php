@@ -194,7 +194,7 @@
                 <span>Entretiens du Jour</span>
             </a>
 
-            <a href="/historique-des-entretiens"
+            <a href="{{ route('admin.entretiens.tous') }}"
                 class="flex items-center gap-3 px-4 py-3 rounded-2xl font-medium text-sm text-white hover:bg-white/10 transition-colors">
                 <i data-lucide="calendar-check" class="w-5 h-5"></i>
                 <span>Historiques & Passés</span>
