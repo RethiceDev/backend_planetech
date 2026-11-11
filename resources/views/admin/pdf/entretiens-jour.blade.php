@@ -133,6 +133,7 @@
                     <th>N°</th>
                     <th>Nom</th>
                     <th>Prénom(s)</th>
+                     <th>Telephone</th>
                     <th>Poste visé</th>
                     <th style="text-align:center;">Arrivée</th>
                     <th>Émargement</th>
@@ -144,6 +145,7 @@
                         <td class="rang">{{ $loop->iteration }}</td>
                         <td class="nom">{{ $item->nom }}</td>
                         <td>{{ $item->prenoms }}</td>
+                        <td>{{ $item->telephone }}</td>
                         <td class="poste">{{ $item->poste }}</td>
                         <td class="heure">{{ $item->created_at->format('H:i') }}</td>
                         <td class="signature">&nbsp;</td>
