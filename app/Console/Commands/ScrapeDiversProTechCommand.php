@@ -14,21 +14,40 @@ use Illuminate\Support\Str;
 class ScrapeDiversProTechCommand extends Command
 {
     protected $signature = 'scrape:divers-protech';
-    protected $description = 'Scrape les produits divers depuis ProTech Togo dans la catégorie principale Divers';
+    protected $description = 'Nettoie les anciens éléments Divers et scrape les produits depuis ProTech Togo';
 
     public function handle()
     {
-        $this->info("Début du scraping des produits divers depuis ProTech Togo...");
+        $this->info("=== NETTOYAGE DES ANCIENS PRODUITS ET SOUS-CATÉGORIES DIVERS ===");
 
-        // 1. Création de la catégorie principale "Divers"
-        $category = Category::firstOrCreate([
-            'nom' => 'Divers'
+        // 1. Suppression sécurisée des anciens produits et sous-catégories liés à "Divers"
+        $oldCategory = Category::where('nom', 'Divers')->first();
+        if ($oldCategory) {
+            $oldSubCategories = SousCategorie::where('category_id', $oldCategory->id)->pluck('id');
+
+            // Suppression des produits liés à ces sous-catégories
+            $deletedProductsCount = Product::whereIn('sous_categorie_id', $oldSubCategories)->delete();
+            $this->info(" -> Produits 'Divers' supprimés : {$deletedProductsCount}");
+
+            // Suppression des sous-catégories
+            SousCategorie::where('category_id', $oldCategory->id)->delete();
+
+            // Suppression de la catégorie principale elle-même
+            $oldCategory->delete();
+            $this->info(" -> Ancienne catégorie 'Divers' purgée avec succès.");
+        }
+
+        $this->info("\n=== DÉBUT DU SCRAPING PROTECH TOGO (INFORMATIQUE ET BUREAUTIQUE) ===");
+
+        // 2. Création de la catégorie principale "Informatique et Bureautique"
+        $informatique = Category::firstOrCreate([
+            'nom' => 'Informatique et Bureautique'
         ]);
 
-        // 2. Sous-catégorie par défaut "Divers" liée à la catégorie principale
+        // 3. Initialisation de la sous-catégorie "Accessoires et Connectique PC" (ou autre selon votre besoin)
         $sousCategorie = SousCategorie::firstOrCreate([
-            'category_id' => $category->id,
-            'nom' => 'Divers'
+            'category_id' => $informatique->id,
+            'nom' => 'Accessoires et Connectique PC'
         ]);
 
         $baseUrl = 'https://protechtogo.com/product-category/autres-informatiques/';
@@ -83,6 +102,10 @@ class ScrapeDiversProTechCommand extends Command
                     $localImagePath = null;
                     if ($imageUrl) {
                         try {
+                            if (str_starts_with($imageUrl, '//')) {
+                                $imageUrl = 'https:' . $imageUrl;
+                            }
+
                             $responseImg = Http::timeout(15)->withHeaders([
                                 'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
                             ])->get($imageUrl);
@@ -98,10 +121,10 @@ class ScrapeDiversProTechCommand extends Command
                     }
 
                     $descNode = $node->filter('.short-description, .product-details, p');
-                    $description = $descNode->count() > 0 ? trim($descNode->text()) : "Produit divers disponible sur devis.";
+                    $description = $descNode->count() > 0 ? trim($descNode->text()) : "Produit informatique disponible sur devis.";
 
                     // Enregistrement en base de données
-                    Product::firstOrCreate(
+                    Product::updateOrCreate(
                         [
                             'sous_categorie_id' => $sousCategorie->id,
                             'name' => $name
@@ -122,6 +145,6 @@ class ScrapeDiversProTechCommand extends Command
             });
         }
 
-        $this->info("Scraping des produits divers ProTech terminé avec succès !");
+        $this->info("Scraping des produits ProTech terminé avec succès !");
     }
 }
