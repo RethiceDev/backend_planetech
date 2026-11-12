@@ -94,7 +94,7 @@
                             </div>
                             <div class="md:col-span-2">
                                 <label class="block text-xs font-semibold text-slate-600 mb-1">Adresse E-mail du Procurant</label>
-                                <input type="email" name="email_procurant" placeholder="E-mail (facultatif)" value="{{ old('email_procurant') }}" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm">
+                                <input type="email" name="email_procurant" placeholder="E-mail" value="{{ old('email_procurant') }}" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm">
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 mb-1">Valide du (Début) *</label>
