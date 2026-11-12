@@ -18,6 +18,13 @@ use App\Http\Controllers\Admin\DechargeController;
 use App\Http\Controllers\Admin\ProcurationController;
 use App\Http\Controllers\LivraisonController;
 use App\Http\Controllers\EntretienController;
+use App\Http\Controllers\Admin\AttestationController;
+
+// ... dans le groupe admin existant (prefix 'admin', name 'admin.', middleware auth)
+Route::get('attestations', [AttestationController::class, 'index'])->name('attestations.index');
+Route::post('attestations', [AttestationController::class, 'store'])->name('attestations.store');
+Route::get('attestations/{attestation}/pdf/voir', [AttestationController::class, 'view'])->name('attestations.pdf.view');
+Route::get('attestations/{attestation}/pdf/telecharger', [AttestationController::class, 'download'])->name('attestations.pdf.download');
 
 Route::get('/entretiens/tous/pdf', [EntretienController::class, 'tousPdf'])->name('admin.entretiens.tous.pdf');
 
@@ -195,21 +202,27 @@ Route::middleware([
         ->name('commande.devis');
 
 
-    /*
+   /*
     |--------------------------------------------------------------------------
-    | PROCURATIONS & DÉCHARGES (désormais protégées)
+    | PROCURATIONS, ATTESTATIONS & DÉCHARGES
     |--------------------------------------------------------------------------
     */
-    Route::prefix('admin')->group(function () {
-        Route::get('/procurations', [ProcurationController::class, 'index'])->name('admin.procurations.index');
-        Route::post('/procurations', [ProcurationController::class, 'store'])->name('admin.procurations.store');
-        Route::get('/procurations/{id}/pdf', [ProcurationController::class, 'viewPdf'])->name('admin.procurations.pdf.view');
-        Route::get('/procurations/{id}/download', [ProcurationController::class, 'downloadPdf'])->name('admin.procurations.pdf.download');
+    // Procurations
+    Route::get('/procurations', [ProcurationController::class, 'index'])->name('admin.procurations.index');
+    Route::post('/procurations', [ProcurationController::class, 'store'])->name('admin.procurations.store');
+    Route::get('/procurations/{id}/pdf', [ProcurationController::class, 'viewPdf'])->name('admin.procurations.pdf.view');
+    Route::get('/procurations/{id}/download', [ProcurationController::class, 'downloadPdf'])->name('admin.procurations.pdf.download');
 
-        Route::get('/decharges', [DechargeController::class, 'index'])->name('admin.decharges.index');
-        Route::post('/decharges', [DechargeController::class, 'store'])->name('admin.decharges.store');
-        Route::get('/decharges/{decharge}/pdf', [DechargeController::class, 'pdf'])->name('admin.decharges.pdf');
-    });
+    // Attestations
+   // Attestations
+    Route::get('/admin/attestations', [AttestationController::class, 'index'])->name('admin.attestations.index');
+    Route::post('/admin/attestations', [AttestationController::class, 'store'])->name('admin.attestations.store');
+    Route::get('/admin/attestations/{attestation}/pdf/voir', [AttestationController::class, 'view'])->name('admin.attestations.pdf.view');
+    Route::get('/admin/attestations/{attestation}/pdf/telecharger', [AttestationController::class, 'download'])->name('admin.attestations.pdf.download');
+    // Décharges
+    Route::get('/decharges', [DechargeController::class, 'index'])->name('admin.decharges.index');
+    Route::post('/decharges', [DechargeController::class, 'store'])->name('admin.decharges.store');
+    Route::get('/decharges/{decharge}/pdf', [DechargeController::class, 'pdf'])->name('admin.decharges.pdf');
 
     Route::get('/procuration', function () {
         return view('admin.procuration');
