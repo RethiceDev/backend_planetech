@@ -4,57 +4,54 @@
     <meta charset="UTF-8">
     <title>Procuration - {{ $procuration->reference }}</title>
     <style>
-        /* Marges strictes pour encadrer la zone d'impression entre l'en-tête et la signature physique */
+        /* En-tête et pied de page déjà pré-imprimés sur le papier : on réserve juste l'espace */
         @page {
             size: A4 portrait;
-            margin-top: 45mm;    /* Réserve l'espace pour l'en-tête couleur pré-imprimé */
-            margin-bottom: 50mm; /* Réserve l'espace pour la zone basse (signature + nom/titre du DG) */
+            margin-top: 45mm;
+            margin-bottom: 50mm;
             margin-left: 20mm;
             margin-right: 20mm;
         }
 
         body {
-            font-family: DejaVu Sans, sans-serif;
+            font-family: "Times New Roman", Times, serif;
             color: #111;
-            font-size: 13px;
-            line-height: 1.6;
+            font-size: 17px;
+            line-height: 1.9;
             margin: 0;
+            padding: 0;
         }
 
         .title {
             text-align: center;
-            font-size: 20px;
+            font-size: 28px;
             font-weight: bold;
             text-decoration: underline;
-            margin: 0 0 20px 0;
-            letter-spacing: 0.5px;
+            margin: 50px 0 0px 0;
         }
 
         .content {
             text-align: justify;
-            margin-bottom: 15px;
+            text-indent: 30px;
+            margin: 0 0 12px 0;
         }
 
         .actions-list {
-            margin: 10px 0 20px 20px;
-        }
-
-        .actions-list li {
-            margin-bottom: 4px;
+            margin: 4px 0 12px 45px;
+            padding: 0;
+            list-style-type: disc;
         }
 
         .footer-date {
             text-align: right;
-            margin-top: 25px;
-            margin-bottom: 15px;
-            font-style: italic;
+            margin: 14px 40px 0 0;
         }
 
-        /* Bloc de signature positionné en bas pour imprimer le nom et le titre sous la signature du DG */
+        /* Bloc de signature */
         table.signature {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 10px;
+            margin: 2cm 0 0 0;
             page-break-inside: avoid;
         }
         table.signature td.vide {
@@ -64,28 +61,38 @@
             width: 50%;
             text-align: center;
             vertical-align: top;
-        }
-        .sig-nom {
-            font-weight: bold;
-            margin: 0;
+            padding: 0;
         }
         .sig-titre {
             margin: 0;
-            font-size: 12px;
-            color: #333;
+            text-transform: uppercase;
+        }
+        .sig-nom {
+            font-style: italic;
+            margin: 0;
         }
     </style>
 </head>
 <body>
-    <br><br>
+    @php
+        // Date avec mois en lettres, en majuscules : 10 NOVEMBRE 2026
+        $dateLettres = fn($date) => mb_strtoupper(
+            \Carbon\Carbon::parse($date)
+                ->timezone('Africa/Porto-Novo')
+                ->locale('fr')
+                ->translatedFormat('d F Y'),
+            'UTF-8'
+        );
+    @endphp
+
     <div class="title">PROCURATION</div>
 
     <div class="content">
-        Je soussigné Monsieur <strong>{{ $procuration->nom_donnateur }}</strong> agissant en tant que <strong>{{ $procuration->role_donnateur }}</strong> de la société <strong>PLANETECH SARL</strong>, déclare donner pouvoir par la présente à : Monsieur/Madame <strong>{{ $procuration->nom_procurant }}</strong>, titulaire du <strong>Certificat d'Identification Personnelle (CIP) N° {{ $procuration->cip_procurant }}</strong> qui expire le {{ \Carbon\Carbon::parse($procuration->expiration_cip)->format('d/m/Y') }}, agissant en qualité de <strong>{{ $procuration->role_procurant }}</strong> de ladite SOCIETE, afin de me représenter conformément à mes intérêts.
+        Je soussigné Monsieur <strong>{{ $procuration->nom_donnateur }}</strong> agissant en tant que {{ $procuration->role_donnateur }} de la société <strong>PLANETECH SARL</strong>, déclare donner pouvoir par la présente à : {{ $procuration->civilite_procurant ?? 'Monsieur' }} <strong>{{ $procuration->nom_procurant }}</strong>, titulaire du <strong>Certificat d'Identification Personnelle (CIP) N°{{ $procuration->cip_procurant }}</strong> qui expire le {{ \Carbon\Carbon::parse($procuration->expiration_cip)->format('d/m/Y') }}, agissant en qualité de {{ $procuration->role_procurant }} de ladite SOCIETE, afin de me représenter conformément à mes intérêts.
     </div>
 
     <div class="content">
-        Par cette procuration valable du <strong>{{ \Carbon\Carbon::parse($procuration->date_debut)->format('d/m/Y') }}</strong> au <strong>{{ \Carbon\Carbon::parse($procuration->date_fin)->format('d/m/Y') }}</strong>, il est en droit d'effectuer l'opération suivante :
+        Par cette procuration valable du <strong>{{ $dateLettres($procuration->date_debut) }} au {{ $dateLettres($procuration->date_fin) }}</strong> il est en droit d'effectuer l'opération suivante :
     </div>
 
     <ul class="actions-list">
@@ -99,21 +106,18 @@
     </div>
 
     <div class="footer-date">
-        Fait à Cotonou, le {{ $procuration->created_at->format('d/m/Y') }}
+        Faite à Cotonou, le {{ $dateLettres(now()) }}
     </div>
 
-    <!-- Le nom et le titre s'impriment juste sous la zone de signature manuscrite -->
     <table class="signature">
         <tr>
             <td class="vide"></td>
             <td class="sig">
-                <!-- Espace vide virtuel de sécurité au-dessus du nom pour que la signature manuscrite du DG repose naturellement dedans -->
-                <div style="height: 25px;"></div><br><br><br>
-                <p class="sig-nom">Armelle ASSOGBA</p><br><br><br><br>
-                <p class="sig-titre">Directeur Général</p>
+                <p class="sig-titre">Le Directeur Général</p>
+                <div style="height: 3cm;margin-bottom:5px"></div> <!-- espace pour signature et cachet -->
+                <p class="sig-nom">Armelle ASSOGBA</p>
             </td>
         </tr>
     </table>
-
 </body>
 </html>
