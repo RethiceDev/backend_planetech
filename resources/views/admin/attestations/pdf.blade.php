@@ -71,7 +71,9 @@
     <br><br><br><br>
 
     <div class="header-ref">
-         N° {{ $attestation->numero }}
+        @if(!empty(trim($attestation->numero)))
+            N° : {{ $attestation->numero }}
+        @endif
     </div>
 
     <div class="title">
