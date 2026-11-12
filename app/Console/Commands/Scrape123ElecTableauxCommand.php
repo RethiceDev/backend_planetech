@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
 class Scrape123ElecTableauxCommand extends Command
 {
     protected $signature = 'scrape:123elec-tableaux';
-    protected $description = 'Scrape les tableaux électriques depuis 123elec (Hyva Theme)';
+    protected $description = 'Scrape les tableaux électriques depuis 123elec avec gestion robuste des images';
 
     public function handle()
     {
@@ -47,17 +47,16 @@ class Scrape123ElecTableauxCommand extends Command
             }
 
             $crawler = new Crawler($response->body());
-            
             $nodes = $crawler->filter('.product-item, li.item.product, [data-product-id]');
             $this->info(" -> Produits détectés dans le HTML : " . $nodes->count());
 
             if ($nodes->count() === 0) {
-                $this->line(" -> Plus de produits détectés, fin de la pagination.");
                 break;
             }
 
             $nodes->each(function (Crawler $node) use ($sousCategorie, &$totalImported) {
                 try {
+                    // 1. Nom du produit
                     $name = '';
                     foreach (['h1', 'h2', 'h3', 'strong', 'a'] as $tag) {
                         $filtered = $node->filter($tag);
@@ -74,6 +73,7 @@ class Scrape123ElecTableauxCommand extends Command
                         return;
                     }
 
+                    // 2. Récupération de l'image (comparable à la logique ProTech)
                     $imgNode = $node->filter('img');
                     $imageUrl = null;
                     if ($imgNode->count() > 0) {
@@ -88,19 +88,32 @@ class Scrape123ElecTableauxCommand extends Command
 
                     $localImagePath = null;
                     if ($imageUrl) {
+                        if (str_starts_with($imageUrl, '//')) {
+                            $imageUrl = 'https:' . $imageUrl;
+                        }
+
                         try {
-                            if (str_starts_with($imageUrl, '//')) {
-                                $imageUrl = 'https:' . $imageUrl;
-                            }
-                            $responseImg = Http::timeout(5)->get($imageUrl);
+                            // Utilisation d'un User-Agent explicite pour simuler un vrai navigateur lors du téléchargement de l'image
+                            $responseImg = Http::withHeaders([
+                                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                                'Referer' => 'https://www.123elec.com/'
+                            ])->timeout(10)->get($imageUrl);
+
                             if ($responseImg->successful() && !empty($responseImg->body())) {
                                 $imageName = Str::slug(substr($name, 0, 40)) . '-' . time() . '.jpg';
+                                
+                                // Sauvegarde dans le disque public (storage/app/public/products/)
                                 Storage::disk('public')->put('products/' . $imageName, $responseImg->body());
+                                
+                                // Chemin stocké en base
                                 $localImagePath = 'storage/products/' . $imageName;
                             }
-                        } catch (\Exception $ex) {}
+                        } catch (\Exception $ex) {
+                            // En cas d'échec du téléchargement, on laisse l'image à null ou une image par défaut
+                        }
                     }
 
+                    // 3. Prix
                     $priceText = '';
                     $priceElements = $node->filter('.price, span[data-price-amount], .price-wrapper');
                     if ($priceElements->count() > 0) {
@@ -116,6 +129,7 @@ class Scrape123ElecTableauxCommand extends Command
                         $price = is_numeric($cleanPrice) ? (float)$cleanPrice : null;
                     }
 
+                    // 4. Enregistrement en base
                     $product = Product::firstOrCreate(
                         [
                             'sous_categorie_id' => $sousCategorie->id,
@@ -131,19 +145,19 @@ class Scrape123ElecTableauxCommand extends Command
                     );
 
                     $totalImported++;
-                    $this->line("    [✔] Inséré en BDD : " . substr($name, 0, 50) . "... (" . ($price ? $price . " €" : "Prix sur devis") . ")");
+                    $imgStatus = $localImagePath ? "[Img OK]" : "[Sans Img]";
+                    $this->line("    [✔] Inséré : " . substr($name, 0, 40) . "... {$imgStatus}");
                 } catch (\Exception $e) {
                     $this->error("    [X] Erreur : " . $e->getMessage());
                 }
             });
 
-            // Correction du sélecteur CSS de pagination avec crochets [rel="next"]
             $nextPage = $crawler->filter('.pages-item-next a, a.action.next, [rel="next"]');
             if ($nextPage->count() === 0) {
                 break;
             }
         }
 
-        $this->info("\nTerminé ! Total de produits insérés/traités : {$totalImported}");
+        $this->info("\nTerminé ! Total traité : {$totalImported}");
     }
 }
