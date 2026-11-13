@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
 class Scrape123ElecTableauxCommand extends Command
 {
     protected $signature = 'scrape:123elec-tableaux';
-    protected $description = 'Scrape les tableaux électriques 123elec en récupérant les images via les pages de détails';
+    protected $description = 'Scrape les tableaux 123elec avec récupération infaillible des images via og:image';
 
     public function handle()
     {
@@ -86,17 +86,18 @@ class Scrape123ElecTableauxCommand extends Command
                         continue;
                     }
 
-                    // Vérifier si le produit existe déjà en base
+                    // Récupération du produit en base
                     $product = Product::where('sous_categorie_id', $sousCategorie->id)
                                       ->where('name', $name)
                                       ->first();
 
+                    // Si le produit existe et a déjà une photo, on l'ignore
                     if ($product && !empty($product->photo)) {
                         $totalProcessed++;
                         continue;
                     }
 
-                    // 2. Visiter la page de détail du produit pour récupérer la vraie image haute résolution
+                    // 2. EXTRACTION UNIVERSELLE VIA LA MÉTA OG:IMAGE DE LA FICHE PRODUIT
                     $imageUrl = null;
                     if (!empty($productUrl)) {
                         try {
@@ -107,30 +108,15 @@ class Scrape123ElecTableauxCommand extends Command
 
                             if ($productPageResponse->successful()) {
                                 $productCrawler = new Crawler($productPageResponse->body());
-                                // Sélecteurs courants pour l'image principale sur une fiche produit Magento / e-commerce
-                                $imgDetail = $productCrawler->filter('.gallery-image, .fotorama__img, .product-image-photo, .main-image img, .product-image img');
 
-                                if ($imgDetail->count() > 0) {
-                                    foreach ($imgDetail as $imgEl) {
-                                        $imgCrawlerSingle = new Crawler($imgEl);
-                                        foreach (['src', 'data-src', 'data-large_image', 'srcset'] as $attr) {
-                                            if ($imgEl->hasAttribute($attr)) {
-                                                $val = trim($imgEl->getAttribute($attr));
-                                                if ($attr === 'srcset') {
-                                                    $parts = explode(',', $val);
-                                                    $val = trim(explode(' ', trim($parts[0]))[0]);
-                                                }
-                                                if (!empty($val) && !str_contains($val, 'placeholder') && !str_starts_with($val, 'data:image')) {
-                                                    $imageUrl = $val;
-                                                    break 2;
-                                                }
-                                            }
-                                        }
-                                    }
+                                // Ciblage direct de la balise Open Graph (présente sur toutes les fiches e-commerce)
+                                $ogImageNode = $productCrawler->filter('meta[property="og:image"]');
+                                if ($ogImageNode->count() > 0) {
+                                    $imageUrl = trim($ogImageNode->attr('content'));
                                 }
                             }
                         } catch (\Exception $e) {
-                            // En cas d'échec de la page détail, on continue
+                            // Ignorer l'erreur réseau de la page produit
                         }
                     }
 
@@ -138,8 +124,6 @@ class Scrape123ElecTableauxCommand extends Command
                     if ($imageUrl) {
                         if (str_starts_with($imageUrl, '//')) {
                             $imageUrl = 'https:' . $imageUrl;
-                        } elseif (str_starts_with($imageUrl, '/')) {
-                            $imageUrl = 'https://www.123elec.com' . $imageUrl;
                         }
 
                         try {
@@ -174,7 +158,7 @@ class Scrape123ElecTableauxCommand extends Command
                         $price = is_numeric($cleanPrice) ? (float)$cleanPrice : null;
                     }
 
-                    // 4. Enregistrement en base de données
+                    // 4. Enregistrement ou mise à jour en base de données
                     if ($product) {
                         $product->update([
                             'price' => $price ?? $product->price,
