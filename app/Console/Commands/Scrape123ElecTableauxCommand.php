@@ -14,11 +14,11 @@ use Illuminate\Support\Str;
 class Scrape123ElecTableauxCommand extends Command
 {
     protected $signature = 'scrape:123elec-tableaux';
-    protected $description = 'Scrape et met à jour les tableaux électriques 123elec avec correction intelligente des photos manquantes';
+    protected $description = 'Scrape et met à jour les tableaux électriques 123elec avec extraction d\'image ultra-robuste';
 
     public function handle()
     {
-        $this->info("Début du scraping et de la mise à jour des tableaux électriques sur 123elec...");
+        $this->info("Début du scraping des tableaux électriques sur 123elec...");
 
         $electricite = Category::firstOrCreate([
             'nom' => 'Électricité Générale'
@@ -79,25 +79,25 @@ class Scrape123ElecTableauxCommand extends Command
                         continue;
                     }
 
-                    // 2. Recherche ou création du produit en base (sans perte de données)
+                    // Recherche du produit existant en base
                     $product = Product::where('sous_categorie_id', $sousCategorie->id)
                                       ->where('name', $name)
                                       ->first();
 
-                    // Si le produit existe déjà et qu'il a déjà une photo, on peut l'ignorer pour gagner du temps
+                    // Si le produit a déjà une photo valide, on passe au suivant
                     if ($product && !empty($product->photo)) {
                         $totalProcessed++;
                         continue;
                     }
 
-                    // 3. Extraction robuste de l'image (Compatible Hyvä / Magento 2)
+                    // 2. EXTRACTION ULTRA-ROBUSTE DE L'IMAGE POUR 123ELEC
                     $imageUrl = null;
-                    $imgNodes = $node->filter('img');
 
-                    if ($imgNodes->count() > 0) {
-                        foreach ($imgNodes as $imgDom) {
+                    // On teste tous les endroits possibles où Magento / Hyva cache l'image
+                    $potentialImages = $node->filter('img, source, [data-src], [data-image]');
+                    if ($potentialImages->count() > 0) {
+                        foreach ($potentialImages as $imgDom) {
                             $attributes = ['data-src', 'data-lazy-src', 'data-original', 'data-srcset', 'srcset', 'src', 'data-image', ':src'];
-
                             foreach ($attributes as $attr) {
                                 if ($imgDom->hasAttribute($attr)) {
                                     $val = trim($imgDom->getAttribute($attr));
@@ -140,7 +140,7 @@ class Scrape123ElecTableauxCommand extends Command
                         }
                     }
 
-                    // 4. Extraction du prix
+                    // 3. Extraction du prix
                     $priceText = '';
                     $priceElements = $node->filter('.price, span[data-price-amount], .price-wrapper, .normal-price .price');
                     if ($priceElements->count() > 0) {
@@ -156,9 +156,8 @@ class Scrape123ElecTableauxCommand extends Command
                         $price = is_numeric($cleanPrice) ? (float)$cleanPrice : null;
                     }
 
-                    // 5. Sauvegarde ou mise à jour du produit
+                    // 4. Enregistrement ou mise à jour en base de données
                     if ($product) {
-                        // Mettre à jour la photo si elle manquait
                         $product->update([
                             'price' => $price ?? $product->price,
                             'photo' => $localImagePath ?? $product->photo,
@@ -166,7 +165,6 @@ class Scrape123ElecTableauxCommand extends Command
                         $totalUpdated++;
                         $this->line("    [🔄] Mis à jour : " . substr($name, 0, 40) . "... " . ($localImagePath ? "[Photo Ajoutée]" : "[Sans Photo]"));
                     } else {
-                        // Créer le produit s'il n'existe pas du tout
                         Product::create([
                             'sous_categorie_id' => $sousCategorie->id,
                             'name' => $name,
@@ -192,6 +190,6 @@ class Scrape123ElecTableauxCommand extends Command
             }
         }
 
-        $this->info("\nTerminé ! Total traité : {$totalProcessed} | Total mis à jour/insérés : {$totalUpdated}");
+        $this->info("\nTerminé ! Total traité : {$totalProcessed} | Total mis à jour : {$totalUpdated}");
     }
 }
