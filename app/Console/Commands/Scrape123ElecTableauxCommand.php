@@ -14,11 +14,11 @@ use Illuminate\Support\Str;
 class Scrape123ElecTableauxCommand extends Command
 {
     protected $signature = 'scrape:123elec-tableaux';
-    protected $description = 'Scrape les tableaux électriques depuis 123elec avec gestion robuste des images et des prix';
+    protected $description = 'Scrape et met à jour les tableaux électriques 123elec avec correction intelligente des photos manquantes';
 
     public function handle()
     {
-        $this->info("Début du scraping des tableaux électriques sur 123elec...");
+        $this->info("Début du scraping et de la mise à jour des tableaux électriques sur 123elec...");
 
         $electricite = Category::firstOrCreate([
             'nom' => 'Électricité Générale'
@@ -30,7 +30,8 @@ class Scrape123ElecTableauxCommand extends Command
         ]);
 
         $baseUrl = 'https://www.123elec.com/gamme-materiel-electrique/tableaux-electriques.html';
-        $totalImported = 0;
+        $totalProcessed = 0;
+        $totalUpdated = 0;
 
         for ($page = 1; $page <= 10; $page++) {
             $url = $page === 1 ? $baseUrl : $baseUrl . '?p=' . $page;
@@ -78,14 +79,23 @@ class Scrape123ElecTableauxCommand extends Command
                         continue;
                     }
 
-                    // 2. Extraction ultra-élargie de l'image (Hyva / Magento 2 / Alpine data attributes)
+                    // 2. Recherche ou création du produit en base (sans perte de données)
+                    $product = Product::where('sous_categorie_id', $sousCategorie->id)
+                                      ->where('name', $name)
+                                      ->first();
+
+                    // Si le produit existe déjà et qu'il a déjà une photo, on peut l'ignorer pour gagner du temps
+                    if ($product && !empty($product->photo)) {
+                        $totalProcessed++;
+                        continue;
+                    }
+
+                    // 3. Extraction robuste de l'image (Compatible Hyvä / Magento 2)
                     $imageUrl = null;
                     $imgNodes = $node->filter('img');
 
                     if ($imgNodes->count() > 0) {
                         foreach ($imgNodes as $imgDom) {
-                            $imgCrawler = new Crawler($imgDom);
-                            // On teste tous les attributs possibles y compris les liaisons dynamiques ou data-*
                             $attributes = ['data-src', 'data-lazy-src', 'data-original', 'data-srcset', 'srcset', 'src', 'data-image', ':src'];
 
                             foreach ($attributes as $attr) {
@@ -102,17 +112,6 @@ class Scrape123ElecTableauxCommand extends Command
                                         break 2;
                                     }
                                 }
-                            }
-                        }
-                    }
-
-                    // Fallback de secours : chercher une image via une balise source ou un style background-image
-                    if (!$imageUrl) {
-                        $bgNodes = $node->filter('[style*="background-image"]');
-                        if ($bgNodes->count() > 0) {
-                            $style = $bgNodes->attr('style');
-                            if (preg_match('/url\(([^)]+)\)/', $style, $match)) {
-                                $imageUrl = trim($match[1], " '\"");
                             }
                         }
                     }
@@ -141,7 +140,7 @@ class Scrape123ElecTableauxCommand extends Command
                         }
                     }
 
-                    // 3. Extraction du prix
+                    // 4. Extraction du prix
                     $priceText = '';
                     $priceElements = $node->filter('.price, span[data-price-amount], .price-wrapper, .normal-price .price');
                     if ($priceElements->count() > 0) {
@@ -157,24 +156,31 @@ class Scrape123ElecTableauxCommand extends Command
                         $price = is_numeric($cleanPrice) ? (float)$cleanPrice : null;
                     }
 
-                    // 4. Enregistrement en base de données
-                    $product = Product::firstOrCreate(
-                        [
+                    // 5. Sauvegarde ou mise à jour du produit
+                    if ($product) {
+                        // Mettre à jour la photo si elle manquait
+                        $product->update([
+                            'price' => $price ?? $product->price,
+                            'photo' => $localImagePath ?? $product->photo,
+                        ]);
+                        $totalUpdated++;
+                        $this->line("    [🔄] Mis à jour : " . substr($name, 0, 40) . "... " . ($localImagePath ? "[Photo Ajoutée]" : "[Sans Photo]"));
+                    } else {
+                        // Créer le produit s'il n'existe pas du tout
+                        Product::create([
                             'sous_categorie_id' => $sousCategorie->id,
-                            'name' => $name
-                        ],
-                        [
+                            'name' => $name,
                             'price' => $price,
                             'photo' => $localImagePath,
                             'description' => "Tableau électrique et équipement modulaire de qualité professionnelle disponible sur 123elec.",
                             'created_at' => now(),
                             'updated_at' => now()
-                        ]
-                    );
+                        ]);
+                        $totalUpdated++;
+                        $this->line("    [✔] Inséré : " . substr($name, 0, 40) . "... " . ($localImagePath ? "[Avec Photo]" : "[Sans Photo]"));
+                    }
 
-                    $totalImported++;
-                    $imgStatus = $localImagePath ? "[Avec Photo]" : "[Sans Photo]";
-                    $this->line("    [✔] Inséré : " . substr($name, 0, 40) . "... {$imgStatus} (" . ($price ? $price . " €" : "Prix sur devis") . ")");
+                    $totalProcessed++;
                 } catch (\Exception $e) {
                     $this->error("    [X] Erreur : " . $e->getMessage());
                 }
@@ -186,6 +192,6 @@ class Scrape123ElecTableauxCommand extends Command
             }
         }
 
-        $this->info("\nTerminé ! Total traité : {$totalImported}");
+        $this->info("\nTerminé ! Total traité : {$totalProcessed} | Total mis à jour/insérés : {$totalUpdated}");
     }
 }
