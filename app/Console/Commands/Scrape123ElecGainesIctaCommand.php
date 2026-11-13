@@ -26,7 +26,7 @@ class Scrape123ElecGainesIctaCommand extends Command
             ['created_at' => now(), 'updated_at' => now()]
         );
 
-        // 2. Attribution ciblée dans la sous-catégorie Câbles et Conducteurs
+        // 2. Attribution ciblée dans la sous-catégorie exacte
         $sousCategorie = SousCategorie::firstOrCreate(
             [
                 'category_id' => $electricite->id,
