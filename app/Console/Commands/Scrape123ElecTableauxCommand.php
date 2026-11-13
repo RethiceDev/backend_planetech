@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
 class Scrape123ElecTableauxCommand extends Command
 {
     protected $signature = 'scrape:123elec-tableaux';
-    protected $description = 'Scrape et met à jour les tableaux électriques 123elec avec extraction d\'image ultra-robuste';
+    protected $description = 'Scrape les tableaux électriques 123elec en récupérant les images via les pages de détails';
 
     public function handle()
     {
@@ -60,8 +60,15 @@ class Scrape123ElecTableauxCommand extends Command
                 try {
                     $node = new Crawler($domElement);
 
-                    // 1. Extraction du nom du produit
+                    // 1. Extraction du nom et du lien de la page produit
                     $name = '';
+                    $productUrl = '';
+
+                    $linkNode = $node->filter('a.product-item-photo, a.product.photo, a[href*=".html"]');
+                    if ($linkNode->count() > 0) {
+                        $productUrl = $linkNode->attr('href');
+                    }
+
                     foreach (['h1', 'h2', 'h3', 'strong', 'a'] as $tag) {
                         $filtered = $node->filter($tag);
                         if ($filtered->count() > 0) {
@@ -79,40 +86,51 @@ class Scrape123ElecTableauxCommand extends Command
                         continue;
                     }
 
-                    // Recherche du produit existant en base
+                    // Vérifier si le produit existe déjà en base
                     $product = Product::where('sous_categorie_id', $sousCategorie->id)
                                       ->where('name', $name)
                                       ->first();
 
-                    // Si le produit a déjà une photo valide, on passe au suivant
                     if ($product && !empty($product->photo)) {
                         $totalProcessed++;
                         continue;
                     }
 
-                    // 2. EXTRACTION ULTRA-ROBUSTE DE L'IMAGE POUR 123ELEC
+                    // 2. Visiter la page de détail du produit pour récupérer la vraie image haute résolution
                     $imageUrl = null;
+                    if (!empty($productUrl)) {
+                        try {
+                            $productPageResponse = Http::withHeaders([
+                                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+                                'Referer' => $baseUrl
+                            ])->timeout(8)->get($productUrl);
 
-                    // On teste tous les endroits possibles où Magento / Hyva cache l'image
-                    $potentialImages = $node->filter('img, source, [data-src], [data-image]');
-                    if ($potentialImages->count() > 0) {
-                        foreach ($potentialImages as $imgDom) {
-                            $attributes = ['data-src', 'data-lazy-src', 'data-original', 'data-srcset', 'srcset', 'src', 'data-image', ':src'];
-                            foreach ($attributes as $attr) {
-                                if ($imgDom->hasAttribute($attr)) {
-                                    $val = trim($imgDom->getAttribute($attr));
+                            if ($productPageResponse->successful()) {
+                                $productCrawler = new Crawler($productPageResponse->body());
+                                // Sélecteurs courants pour l'image principale sur une fiche produit Magento / e-commerce
+                                $imgDetail = $productCrawler->filter('.gallery-image, .fotorama__img, .product-image-photo, .main-image img, .product-image img');
 
-                                    if ($attr === 'srcset' || $attr === 'data-srcset') {
-                                        $parts = explode(',', $val);
-                                        $val = trim(explode(' ', trim($parts[0]))[0]);
-                                    }
-
-                                    if (!empty($val) && !str_starts_with($val, 'data:image') && !str_contains($val, 'placeholder') && !str_contains($val, 'loader')) {
-                                        $imageUrl = $val;
-                                        break 2;
+                                if ($imgDetail->count() > 0) {
+                                    foreach ($imgDetail as $imgEl) {
+                                        $imgCrawlerSingle = new Crawler($imgEl);
+                                        foreach (['src', 'data-src', 'data-large_image', 'srcset'] as $attr) {
+                                            if ($imgEl->hasAttribute($attr)) {
+                                                $val = trim($imgEl->getAttribute($attr));
+                                                if ($attr === 'srcset') {
+                                                    $parts = explode(',', $val);
+                                                    $val = trim(explode(' ', trim($parts[0]))[0]);
+                                                }
+                                                if (!empty($val) && !str_contains($val, 'placeholder') && !str_starts_with($val, 'data:image')) {
+                                                    $imageUrl = $val;
+                                                    break 2;
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
+                        } catch (\Exception $e) {
+                            // En cas d'échec de la page détail, on continue
                         }
                     }
 
@@ -126,8 +144,8 @@ class Scrape123ElecTableauxCommand extends Command
 
                         try {
                             $responseImg = Http::withHeaders([
-                                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                                'Referer' => 'https://www.123elec.com/'
+                                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+                                'Referer' => $productUrl
                             ])->timeout(10)->get($imageUrl);
 
                             if ($responseImg->successful() && !empty($responseImg->body())) {
@@ -136,7 +154,7 @@ class Scrape123ElecTableauxCommand extends Command
                                 $localImagePath = 'storage/products/' . $imageName;
                             }
                         } catch (\Exception $ex) {
-                            // Ignorer l'échec de téléchargement individuel
+                            // Ignorer l'échec de téléchargement
                         }
                     }
 
@@ -156,7 +174,7 @@ class Scrape123ElecTableauxCommand extends Command
                         $price = is_numeric($cleanPrice) ? (float)$cleanPrice : null;
                     }
 
-                    // 4. Enregistrement ou mise à jour en base de données
+                    // 4. Enregistrement en base de données
                     if ($product) {
                         $product->update([
                             'price' => $price ?? $product->price,
