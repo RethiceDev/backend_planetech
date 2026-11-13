@@ -78,15 +78,16 @@ class Scrape123ElecTableauxCommand extends Command
                         continue;
                     }
 
-                    // 2. Extraction robuste et ciblée de l'image (Magento 2 / Hyva)
+                    // 2. Extraction ultra-élargie de l'image (Hyva / Magento 2 / Alpine data attributes)
                     $imageUrl = null;
-                    // On cible en priorité l'image principale du produit
-                    $imgNode = $node->filter('img.product-image-photo, .product-item-photo img, img');
+                    $imgNodes = $node->filter('img');
 
-                    if ($imgNode->count() > 0) {
-                        $imgDom = $imgNode->getNode(0);
-                        if ($imgDom) {
-                            $attributes = ['data-src', 'data-lazy-src', 'data-original', 'data-srcset', 'srcset', 'src', 'data-image'];
+                    if ($imgNodes->count() > 0) {
+                        foreach ($imgNodes as $imgDom) {
+                            $imgCrawler = new Crawler($imgDom);
+                            // On teste tous les attributs possibles y compris les liaisons dynamiques ou data-*
+                            $attributes = ['data-src', 'data-lazy-src', 'data-original', 'data-srcset', 'srcset', 'src', 'data-image', ':src'];
+
                             foreach ($attributes as $attr) {
                                 if ($imgDom->hasAttribute($attr)) {
                                     $val = trim($imgDom->getAttribute($attr));
@@ -98,9 +99,20 @@ class Scrape123ElecTableauxCommand extends Command
 
                                     if (!empty($val) && !str_starts_with($val, 'data:image') && !str_contains($val, 'placeholder') && !str_contains($val, 'loader')) {
                                         $imageUrl = $val;
-                                        break;
+                                        break 2;
                                     }
                                 }
+                            }
+                        }
+                    }
+
+                    // Fallback de secours : chercher une image via une balise source ou un style background-image
+                    if (!$imageUrl) {
+                        $bgNodes = $node->filter('[style*="background-image"]');
+                        if ($bgNodes->count() > 0) {
+                            $style = $bgNodes->attr('style');
+                            if (preg_match('/url\(([^)]+)\)/', $style, $match)) {
+                                $imageUrl = trim($match[1], " '\"");
                             }
                         }
                     }
@@ -109,6 +121,8 @@ class Scrape123ElecTableauxCommand extends Command
                     if ($imageUrl) {
                         if (str_starts_with($imageUrl, '//')) {
                             $imageUrl = 'https:' . $imageUrl;
+                        } elseif (str_starts_with($imageUrl, '/')) {
+                            $imageUrl = 'https://www.123elec.com' . $imageUrl;
                         }
 
                         try {
