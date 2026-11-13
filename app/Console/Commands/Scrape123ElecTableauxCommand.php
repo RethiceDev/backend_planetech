@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
 class Scrape123ElecTableauxCommand extends Command
 {
     protected $signature = 'scrape:123elec-tableaux';
-    protected $description = 'Scrape les tableaux électriques depuis 123elec avec gestion robuste des images';
+    protected $description = 'Scrape les tableaux électriques depuis 123elec avec gestion sécurisée des images et des prix';
 
     public function handle()
     {
@@ -51,37 +51,52 @@ class Scrape123ElecTableauxCommand extends Command
             $this->info(" -> Produits détectés dans le HTML : " . $nodes->count());
 
             if ($nodes->count() === 0) {
+                $this->line(" -> Plus de produits détectés, fin de la pagination.");
                 break;
             }
 
-            $nodes->each(function (Crawler $node) use ($sousCategorie, &$totalImported) {
+            // Utilisation d'une boucle classique pour un meilleur contrôle des exceptions par produit
+            foreach ($nodes as $i => $domElement) {
                 try {
-                    // 1. Nom du produit
+                    $node = new Crawler($domElement);
+
+                    // 1. Extraction du nom du produit
                     $name = '';
                     foreach (['h1', 'h2', 'h3', 'strong', 'a'] as $tag) {
                         $filtered = $node->filter($tag);
-                        foreach ($filtered as $el) {
-                            $txt = trim($el->textContent);
-                            if (strlen($txt) > 10 && !str_contains(strtolower($txt), 'ajouter') && !str_contains(strtolower($txt), 'stock')) {
-                                $name = $txt;
-                                break 2;
+                        if ($filtered->count() > 0) {
+                            foreach ($filtered as $el) {
+                                $txt = trim($el->textContent);
+                                if (strlen($txt) > 10 && !str_contains(strtolower($txt), 'ajouter') && !str_contains(strtolower($txt), 'stock')) {
+                                    $name = $txt;
+                                    break 2;
+                                }
                             }
                         }
                     }
 
                     if (empty($name)) {
-                        return;
+                        continue;
                     }
 
-                    // 2. Récupération de l'image (comparable à la logique ProTech)
-                    $imgNode = $node->filter('img');
+                    // 2. Récupération sécurisée de l'image (sans exception DomCrawler)
                     $imageUrl = null;
+                    $imgNode = $node->filter('img');
                     if ($imgNode->count() > 0) {
-                        foreach (['data-src', 'src', 'data-image', 'data-lazy-src'] as $attr) {
-                            $val = $imgNode->attr($attr);
-                            if ($val && !str_starts_with($val, 'data:image') && !str_contains($val, 'placeholder')) {
-                                $imageUrl = $val;
-                                break;
+                        $imgDom = $imgNode->getNode(0);
+                        if ($imgDom) {
+                            foreach (['data-src', 'src', 'data-image', 'data-lazy-src', 'srcset'] as $attr) {
+                                if ($imgDom->hasAttribute($attr)) {
+                                    $val = $imgDom->getAttribute($attr);
+                                    if ($attr === 'srcset') {
+                                        $parts = explode(',', $val);
+                                        $val = trim(explode(' ', trim($parts[0]))[0]);
+                                    }
+                                    if ($val && !str_starts_with($val, 'data:image') && !str_contains($val, 'placeholder')) {
+                                        $imageUrl = $val;
+                                        break;
+                                    }
+                                }
                             }
                         }
                     }
@@ -93,29 +108,24 @@ class Scrape123ElecTableauxCommand extends Command
                         }
 
                         try {
-                            // Utilisation d'un User-Agent explicite pour simuler un vrai navigateur lors du téléchargement de l'image
                             $responseImg = Http::withHeaders([
                                 'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                                 'Referer' => 'https://www.123elec.com/'
-                            ])->timeout(10)->get($imageUrl);
+                            ])->timeout(8)->get($imageUrl);
 
                             if ($responseImg->successful() && !empty($responseImg->body())) {
-                                $imageName = Str::slug(substr($name, 0, 40)) . '-' . time() . '.jpg';
-                                
-                                // Sauvegarde dans le disque public (storage/app/public/products/)
+                                $imageName = Str::slug(substr($name, 0, 40)) . '-' . time() . '-' . rand(100, 999) . '.jpg';
                                 Storage::disk('public')->put('products/' . $imageName, $responseImg->body());
-                                
-                                // Chemin stocké en base
                                 $localImagePath = 'storage/products/' . $imageName;
                             }
                         } catch (\Exception $ex) {
-                            // En cas d'échec du téléchargement, on laisse l'image à null ou une image par défaut
+                            // Ignorer l'échec de téléchargement individuel d'image pour ne pas bloquer l'insertion
                         }
                     }
 
-                    // 3. Prix
+                    // 3. Extraction du prix
                     $priceText = '';
-                    $priceElements = $node->filter('.price, span[data-price-amount], .price-wrapper');
+                    $priceElements = $node->filter('.price, span[data-price-amount], .price-wrapper, .normal-price .price');
                     if ($priceElements->count() > 0) {
                         $priceText = $priceElements->text();
                     } else {
@@ -125,11 +135,11 @@ class Scrape123ElecTableauxCommand extends Command
                     preg_match('/([\d\s,\.]+)\s*€/', $priceText, $matches);
                     $price = null;
                     if (isset($matches[1])) {
-                        $cleanPrice = str_replace([' ', ','], ['', '.'], $matches[1]);
+                        $cleanPrice = str_replace([' ', ','], ['', '.'], trim($matches[1]));
                         $price = is_numeric($cleanPrice) ? (float)$cleanPrice : null;
                     }
 
-                    // 4. Enregistrement en base
+                    // 4. Enregistrement en base de données
                     $product = Product::firstOrCreate(
                         [
                             'sous_categorie_id' => $sousCategorie->id,
@@ -145,12 +155,12 @@ class Scrape123ElecTableauxCommand extends Command
                     );
 
                     $totalImported++;
-                    $imgStatus = $localImagePath ? "[Img OK]" : "[Sans Img]";
-                    $this->line("    [✔] Inséré : " . substr($name, 0, 40) . "... {$imgStatus}");
+                    $imgStatus = $localImagePath ? "[Avec Photo]" : "[Sans Photo]";
+                    $this->line("    [✔] Inséré : " . substr($name, 0, 40) . "... {$imgStatus} (" . ($price ? $price . " €" : "Prix sur devis") . ")");
                 } catch (\Exception $e) {
                     $this->error("    [X] Erreur : " . $e->getMessage());
                 }
-            });
+            }
 
             $nextPage = $crawler->filter('.pages-item-next a, a.action.next, [rel="next"]');
             if ($nextPage->count() === 0) {
