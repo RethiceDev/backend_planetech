@@ -43,8 +43,8 @@ class DechargeController extends Controller
         $validated = $request->validate([
             // Informations du bénéficiaire
             'nom' => ['required', 'string', 'max:255'],
-            'role' => ['required', 'string', 'max:255'],
-            'entreprise' => ['nullable', 'string', 'max:255'],
+            'role' => ['nullable', 'string', 'max:255'],          // facultatif (particulier)
+            'entreprise' => ['nullable', 'string', 'max:255'],    // vide = particulier
             'numero' => ['required', 'string', 'max:50'],
 
             // E-mail facultatif
@@ -53,7 +53,7 @@ class DechargeController extends Controller
             // Type de décharge
             'type' => [
                 'required',
-                'in:argent,materiel,responsabilite',
+                'in:argent,materiel,responsabilite,prestation',
             ],
 
             // Fournisseur / livreur
@@ -77,16 +77,15 @@ class DechargeController extends Controller
                 'max:50',
             ],
 
-            // E-mail du livreur facultatif
             'fournisseur_email' => [
                 'nullable',
                 'email',
                 'max:255',
             ],
 
-            // Décharge d'argent (remise de fonds ou salaire)
+            // Argent (remise de fonds / salaire) et prestation
             'somme' => [
-                'required_if:type,argent',
+                'required_if:type,argent,prestation',
                 'nullable',
                 'numeric',
                 'min:0',
@@ -99,9 +98,9 @@ class DechargeController extends Controller
                 'max:255',
             ],
 
-            // Décharge de responsabilité
+            // Responsabilité et prestation
             'description' => [
-                'required_if:type,responsabilite',
+                'required_if:type,responsabilite,prestation',
                 'nullable',
                 'string',
                 'max:10000',
@@ -147,9 +146,37 @@ class DechargeController extends Controller
                 'nullable',
                 'in:neuf,partiellement_utilise,vieux,defectueux',
             ],
+
+            // Engagement facultatif (matériel et prestation)
+            'engagement_actif' => ['nullable', 'boolean'],
+
+            'engagement_type' => [
+                'required_if:engagement_actif,1',
+                'nullable',
+                'in:achat_materiel,prestation',
+            ],
+
+            'engagement_objet' => [
+                'required_if:engagement_actif,1',
+                'nullable',
+                'string',
+                'max:2000',
+            ],
+
+            'engagement_montant' => ['nullable', 'numeric', 'min:0'],
+
+            'tranches' => ['nullable', 'array'],
+            'tranches.*.nature' => ['required', 'in:paiement,livraison'],
+            'tranches.*.libelle' => ['required', 'string', 'max:255'],
+            'tranches.*.date_prevue' => ['nullable', 'date'],
+            'tranches.*.montant' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $type = $validated['type'];
+
+        // L'engagement n'existe que pour le matériel et la prestation.
+        $avecEngagement = in_array($type, ['materiel', 'prestation'], true)
+            && $request->boolean('engagement_actif');
 
         /*
         |--------------------------------------------------------------------------
@@ -187,11 +214,15 @@ class DechargeController extends Controller
         try {
             $decharge = DB::transaction(function () use (
                 $validated,
-                $type
+                $type,
+                $avecEngagement
             ) {
                 $decharge = Decharge::create([
                     'nom' => trim($validated['nom']),
-                    'role' => trim($validated['role']),
+
+                    'role' => !empty($validated['role'])
+                        ? trim($validated['role'])
+                        : null,
 
                     'entreprise' => !empty($validated['entreprise'])
                         ? trim($validated['entreprise'])
@@ -227,8 +258,8 @@ class DechargeController extends Controller
                     // Type de décharge
                     'type' => $type,
 
-                    // Informations financières
-                    'somme' => $type === 'argent'
+                    // Informations financières (argent et prestation)
+                    'somme' => in_array($type, ['argent', 'prestation'], true)
                         ? ($validated['somme'] ?? null)
                         : null,
 
@@ -236,9 +267,24 @@ class DechargeController extends Controller
                         ? ($validated['motif'] ?? null)
                         : null,
 
-                    // Responsabilité
-                    'description' => $type === 'responsabilite'
+                    // Responsabilité et prestation
+                    'description' => in_array($type, ['responsabilite', 'prestation'], true)
                         ? ($validated['description'] ?? null)
+                        : null,
+
+                    // Engagement facultatif
+                    'engagement_actif' => $avecEngagement,
+
+                    'engagement_type' => $avecEngagement
+                        ? ($validated['engagement_type'] ?? null)
+                        : null,
+
+                    'engagement_objet' => $avecEngagement
+                        ? ($validated['engagement_objet'] ?? null)
+                        : null,
+
+                    'engagement_montant' => $avecEngagement
+                        ? ($validated['engagement_montant'] ?? null)
                         : null,
                 ]);
 
@@ -298,6 +344,25 @@ class DechargeController extends Controller
                     }
                 }
 
+                /*
+                |--------------------------------------------------------------------------
+                | 4 bis. Enregistrer les tranches de l'engagement
+                |--------------------------------------------------------------------------
+                */
+
+                if ($avecEngagement) {
+                    foreach ($validated['tranches'] ?? [] as $t) {
+                        $decharge->tranches()->create([
+                            'nature' => $t['nature'],
+                            'libelle' => trim($t['libelle']),
+                            'date_prevue' => !empty($t['date_prevue']) ? $t['date_prevue'] : null,
+                            'montant' => (isset($t['montant']) && $t['montant'] !== '')
+                                ? $t['montant']
+                                : null,
+                        ]);
+                    }
+                }
+
                 return $decharge;
             });
         } catch (ValidationException $e) {
@@ -330,7 +395,7 @@ class DechargeController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $decharge->load('items');
+        $decharge->load('items', 'tranches');
 
         /*
         |--------------------------------------------------------------------------
@@ -422,7 +487,7 @@ class DechargeController extends Controller
      */
     public function pdf(Request $request, Decharge $decharge)
     {
-        $decharge->load('items');
+        $decharge->load('items', 'tranches');
 
         $logo = null;
 
