@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
 class Scrape123ElecTableauxCommand extends Command
 {
     protected $signature = 'scrape:123elec-tableaux';
-    protected $description = 'Scrape les tableaux électriques depuis 123elec avec gestion sécurisée des images et des prix';
+    protected $description = 'Scrape les tableaux électriques depuis 123elec avec gestion robuste des images et des prix';
 
     public function handle()
     {
@@ -55,7 +55,6 @@ class Scrape123ElecTableauxCommand extends Command
                 break;
             }
 
-            // Utilisation d'une boucle classique pour un meilleur contrôle des exceptions par produit
             foreach ($nodes as $i => $domElement) {
                 try {
                     $node = new Crawler($domElement);
@@ -79,20 +78,25 @@ class Scrape123ElecTableauxCommand extends Command
                         continue;
                     }
 
-                    // 2. Récupération sécurisée de l'image (sans exception DomCrawler)
+                    // 2. Extraction robuste et ciblée de l'image (Magento 2 / Hyva)
                     $imageUrl = null;
-                    $imgNode = $node->filter('img');
+                    // On cible en priorité l'image principale du produit
+                    $imgNode = $node->filter('img.product-image-photo, .product-item-photo img, img');
+
                     if ($imgNode->count() > 0) {
                         $imgDom = $imgNode->getNode(0);
                         if ($imgDom) {
-                            foreach (['data-src', 'src', 'data-image', 'data-lazy-src', 'srcset'] as $attr) {
+                            $attributes = ['data-src', 'data-lazy-src', 'data-original', 'data-srcset', 'srcset', 'src', 'data-image'];
+                            foreach ($attributes as $attr) {
                                 if ($imgDom->hasAttribute($attr)) {
-                                    $val = $imgDom->getAttribute($attr);
-                                    if ($attr === 'srcset') {
+                                    $val = trim($imgDom->getAttribute($attr));
+
+                                    if ($attr === 'srcset' || $attr === 'data-srcset') {
                                         $parts = explode(',', $val);
                                         $val = trim(explode(' ', trim($parts[0]))[0]);
                                     }
-                                    if ($val && !str_starts_with($val, 'data:image') && !str_contains($val, 'placeholder')) {
+
+                                    if (!empty($val) && !str_starts_with($val, 'data:image') && !str_contains($val, 'placeholder') && !str_contains($val, 'loader')) {
                                         $imageUrl = $val;
                                         break;
                                     }
@@ -111,7 +115,7 @@ class Scrape123ElecTableauxCommand extends Command
                             $responseImg = Http::withHeaders([
                                 'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                                 'Referer' => 'https://www.123elec.com/'
-                            ])->timeout(8)->get($imageUrl);
+                            ])->timeout(10)->get($imageUrl);
 
                             if ($responseImg->successful() && !empty($responseImg->body())) {
                                 $imageName = Str::slug(substr($name, 0, 40)) . '-' . time() . '-' . rand(100, 999) . '.jpg';
@@ -119,7 +123,7 @@ class Scrape123ElecTableauxCommand extends Command
                                 $localImagePath = 'storage/products/' . $imageName;
                             }
                         } catch (\Exception $ex) {
-                            // Ignorer l'échec de téléchargement individuel d'image pour ne pas bloquer l'insertion
+                            // Ignorer l'échec de téléchargement individuel
                         }
                     }
 
