@@ -13,7 +13,6 @@
         'argent'         => 'DÉCHARGE DE REMISE DE FONDS',
         'materiel'       => 'DÉCHARGE DE REMISE DE MATÉRIEL',
         'responsabilite' => 'DÉCHARGE DE RESPONSABILITÉ',
-        'prestation'     => 'DÉCHARGE DE PRESTATION DE SERVICE',
     ];
 
     $dateLongue = Carbon::parse($decharge->created_at)->locale('fr')->translatedFormat('j F Y');
@@ -21,6 +20,8 @@
     $lieu       = config('decharge.lieu');
 
     // ---- Remise d'argent : salaire ou autre motif ? ----
+    // Détection par mots-clés dans le motif (sans accents, insensible à la casse).
+    // Si vous avez un champ dédié (ex. $decharge->categorie === 'salaire'), remplacez cette condition.
     $estSalaire = false;
     if ($decharge->type === 'argent') {
         $motifNormalise = Str::lower(Str::ascii((string) $decharge->motif));
@@ -32,9 +33,9 @@
         $titre = 'DÉCHARGE DE PAIEMENT DE SALAIRE';
     }
 
-    // Montant en lettres (argent et prestation) — nécessite l'extension PHP intl
+    // Montant en lettres (nécessite l'extension PHP intl ; sinon on l'omet)
     $montantLettres = null;
-    if (in_array($decharge->type, ['argent', 'prestation'], true) && class_exists(\NumberFormatter::class)) {
+    if ($decharge->type === 'argent' && class_exists(\NumberFormatter::class)) {
         $f = new \NumberFormatter('fr', \NumberFormatter::SPELLOUT);
         $txt = $f->format((int) round((float) $decharge->somme));
         if ($txt !== false) {
@@ -55,40 +56,18 @@
         $contactParts[] = (empty($contactParts) ? 'joignable à' : 'et à')
             . ' l\'adresse électronique <strong>' . e($decharge->email) . '</strong>';
     }
-    $contact    = implode(' ', $contactParts);
-    $contactTxt = $contact !== '' ? ', ' . $contact : '';
+    $contact = implode(' ', $contactParts);
 
-    // ---- Qualité du déclarant : entreprise ou particulier ----
-    $aEntreprise = !empty($decharge->entreprise);
-    $aRole       = !empty($decharge->role);
-
-    if ($aEntreprise && $aRole) {
-        $qualiteTxt = ', agissant en qualité de <strong>' . e($decharge->role) . '</strong> au sein de <strong>' . e($decharge->entreprise) . '</strong>';
-    } elseif ($aEntreprise) {
-        $qualiteTxt = ', agissant pour le compte de <strong>' . e($decharge->entreprise) . '</strong>';
-    } elseif ($aRole) {
-        $qualiteTxt = ', agissant en qualité de <strong>' . e($decharge->role) . '</strong>';
-    } else {
-        $qualiteTxt = ', agissant à titre personnel';
-    }
-
-    // ---- Réceptionnaire du matériel : société ou particulier ----
-    if ($aEntreprise) {
-        $recepteur      = 'la société <strong>' . e($decharge->entreprise) . '</strong>';
-        $sujetReconnait = 'La société <strong>' . e($decharge->entreprise) . '</strong> reconnaît';
-        $verbeEngage    = "s'engage";
-    } else {
-        $recepteur      = '<strong>' . e($decharge->nom) . '</strong>';
-        $sujetReconnait = 'Je reconnais';
-        $verbeEngage    = "m'engage";
-    }
+    // Morceaux de phrase du préambule (construits ici pour éviter des directives Blade collées)
+    $contactTxt    = $contact !== '' ? ', ' . $contact : '';
+    $entrepriseTxt = !empty($decharge->entreprise)
+        ? ' au sein de <strong>' . e($decharge->entreprise) . '</strong>'
+        : '';
 
     // ---- Partie qui signe à droite ----
     $partieDroite = $decharge->type === 'materiel'
         ? ($decharge->fournisseur_entreprise ?: 'le fournisseur')
         : 'PLANETECH SARL';
-
-    $avecEngagement = in_array($decharge->type, ['materiel', 'prestation'], true) && $decharge->engagement_actif;
 @endphp
 <!DOCTYPE html>
 <html lang="fr">
@@ -108,7 +87,6 @@
         .entete .lignes { font-family: 'Times', serif; font-size: 9.5px; font-style: italic; font-weight: bold; color: #000000; line-height: 1.45; }
 
         .titre { text-align: center; margin: 22px 0 4px; font-size: 16px; font-weight: bold; color: #1b4d3e; letter-spacing: 0.5px; }
-        .sous-titre { margin: 18px 0 8px; font-size: 12.5px; font-weight: bold; color: #1b4d3e; border-bottom: 1px solid #1b4d3e; padding-bottom: 2px; }
         .ref { text-align: center; font-size: 10.5px; color: #6b7280; margin-bottom: 20px; }
 
         p.texte { text-align: justify; margin: 0 0 10px; }
@@ -157,7 +135,8 @@
 
     {{-- ===================== PRÉAMBULE (commun) ===================== --}}
     <p class="texte">
-        Je soussigné(e), <strong>{{ $decharge->nom }}</strong>{!! $qualiteTxt !!}{!! $contactTxt !!},
+        Je soussigné(e), <strong>{{ $decharge->nom }}</strong>,
+        agissant en qualité de <strong>{{ $decharge->role }}</strong>{!! $entrepriseTxt !!}{!! $contactTxt !!},
         reconnais et déclare par la présente ce qui suit :
     </p>
 
@@ -209,7 +188,7 @@
             @if(!empty($decharge->fournisseur_entreprise))
                 (représentant l'entreprise <strong>{{ $decharge->fournisseur_entreprise }}</strong>)
             @endif
-            , ce jour, par {!! $recepteur !!},
+            , ce jour, par la société <strong>{{ $decharge->entreprise }}</strong>,
             {{ $pluriel ? 'les matériels et/ou documents désignés' : 'le matériel ou document désigné' }}
             ci-après, dans l'état indiqué pour chacun :
         </p>
@@ -236,36 +215,13 @@
         </table>
 
         <p class="texte">
-            {!! $sujetReconnait !!} {{ $pluriel ? 'les avoir reçus' : 'l\'avoir reçu' }} en l'état mentionné ci-dessus
-            et {{ $verbeEngage }} à {{ $pluriel ? 'les' : 'le' }} traiter selon les termes de la convention d'intervention ou de dépôt convenue.
+            La société <strong>{{ $decharge->entreprise }}</strong> reconnaît {{ $pluriel ? 'les avoir reçus' : 'l\'avoir reçu' }} en l'état mentionné ci-dessus
+            et s'engage à {{ $pluriel ? 'les' : 'le' }} traiter selon les termes de la convention d'intervention ou de dépôt convenue.
         </p>
 
         <p class="texte">
-            La présente décharge atteste de la réception effective par {!! $recepteur !!}
+            La présente décharge atteste de la réception effective par <strong>{{ $decharge->entreprise }}</strong>
             {{ $pluriel ? 'des éléments listés' : 'de l\'élément listé' }} ci-dessus à la date mentionnée.
-        </p>
-
-    @elseif($decharge->type === 'prestation')
-
-        {{-- ---- Prestation de service ---- --}}
-        <p class="texte">
-            Avoir réalisé et/ou fourni au profit de <strong>PLANETECH SARL</strong> la prestation suivante :
-        </p>
-
-        <div class="encadre">
-            {!! nl2br(e($decharge->description)) !!}
-        </div>
-
-        <p class="texte">
-            Et avoir reçu de <strong>PLANETECH SARL</strong>, ce jour, la somme de
-            <strong>{{ number_format((float) $decharge->somme, 0, ',', ' ') }} FCFA</strong>@if($montantLettres)
-            (<em>{{ $montantLettres }}</em>)@endif,
-            {{ $decharge->engagement_actif ? 'à valoir sur le règlement de cette prestation, selon les modalités de l\'engagement ci-dessous' : 'en règlement de cette prestation' }}.
-        </p>
-
-        <p class="texte">
-            En conséquence, <strong>PLANETECH SARL est déchargée de toute obligation de paiement</strong>
-            à concurrence de cette somme.
         </p>
 
     @elseif($decharge->type === 'responsabilite')
@@ -286,63 +242,6 @@
             à ce titre, pour tout dommage, préjudice ou litige qui pourrait en résulter.
         </p>
 
-    @endif
-
-    {{-- ===================== ENGAGEMENT (facultatif) ===================== --}}
-    @if($avecEngagement)
-        <div class="sous-titre">ENGAGEMENT DES PARTIES</div>
-
-        <p class="texte">
-            Les parties conviennent de l'engagement suivant
-            ({{ $decharge->engagement_type === 'achat_materiel' ? 'achat de matériel' : 'prestation / fabrication' }}) :
-        </p>
-
-        <div class="encadre">
-            {!! nl2br(e($decharge->engagement_objet)) !!}
-        </div>
-
-        @if($decharge->engagement_montant)
-            <p class="texte">
-                Montant total convenu : <strong>{{ number_format((float) $decharge->engagement_montant, 0, ',', ' ') }} FCFA</strong>.
-            </p>
-        @endif
-
-        @if($decharge->tranches->count() > 0)
-            <p class="texte">
-                Les paiements et/ou livraisons s'effectueront par tranches, selon le calendrier suivant :
-            </p>
-
-            <table class="list">
-                <thead>
-                    <tr>
-                        <th width="28">N°</th>
-                        <th width="75">Nature</th>
-                        <th>Libellé</th>
-                        <th width="85">Date prévue</th>
-                        <th width="95" style="text-align:right;">Montant</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($decharge->tranches as $i => $t)
-                        <tr>
-                            <td style="text-align:center;">{{ $i + 1 }}</td>
-                            <td>{{ $t->nature === 'paiement' ? 'Paiement' : 'Livraison' }}</td>
-                            <td>{{ $t->libelle }}</td>
-                            <td>{{ $t->date_prevue ? $t->date_prevue->format('d/m/Y') : '—' }}</td>
-                            <td style="text-align:right;">{{ $t->montant ? number_format((float) $t->montant, 0, ',', ' ') . ' FCFA' : '—' }}</td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-
-            <p class="texte">
-                Chaque tranche réglée ou livrée fera l'objet d'une mention écrite ou d'une décharge distincte, signée des deux parties.
-            </p>
-        @endif
-
-        <p class="texte">
-            Les parties s'engagent à respecter les modalités ci-dessus.
-        </p>
     @endif
 
     {{-- ===================== CONCLUSION (commune) ===================== --}}

@@ -94,14 +94,6 @@
                 grid-column: span 1 / span 1 !important;
             }
 
-            .tranche-row {
-                grid-template-columns: minmax(0, 1fr) !important;
-            }
-
-            .tranche-row > div {
-                grid-column: span 1 / span 1 !important;
-            }
-
             .historique-actions {
                 flex-wrap: wrap;
             }
@@ -129,13 +121,6 @@
                 <div class="px-4 py-3 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-800 font-medium text-sm flex items-start gap-2">
                     <i data-lucide="check-circle" class="w-5 h-5 shrink-0"></i>
                     <span>{{ session('success') }}</span>
-                </div>
-            @endif
-
-            @if(session('warning'))
-                <div class="px-4 py-3 rounded-xl bg-amber-100 border border-amber-300 text-amber-800 font-medium text-sm flex items-start gap-2">
-                    <i data-lucide="alert-triangle" class="w-5 h-5 shrink-0"></i>
-                    <span>{{ session('warning') }}</span>
                 </div>
             @endif
 
@@ -216,7 +201,7 @@
                                 Type de Décharge
                             </label>
 
-                            <div class="type-grid grid grid-cols-1 sm:grid-cols-4 gap-3">
+                            <div class="type-grid grid grid-cols-1 sm:grid-cols-3 gap-3">
 
                                 <label class="flex items-center justify-center p-3 rounded-xl border border-gray-200 cursor-pointer hover:bg-emerald-50/50 has-[:checked]:border-forest-700 has-[:checked]:bg-emerald-50 transition-all">
 
@@ -248,23 +233,6 @@
                                     <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
                                         <i data-lucide="box" class="w-4 h-4 text-emerald-600 shrink-0"></i>
                                         Matériel / Doc
-                                    </span>
-
-                                </label>
-
-                                <label class="flex items-center justify-center p-3 rounded-xl border border-gray-200 cursor-pointer hover:bg-emerald-50/50 has-[:checked]:border-forest-700 has-[:checked]:bg-emerald-50 transition-all">
-
-                                    <input
-                                        type="radio"
-                                        name="type"
-                                        value="prestation"
-                                        class="sr-only"
-                                        {{ $oldType === 'prestation' ? 'checked' : '' }}
-                                    >
-
-                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
-                                        <i data-lucide="hammer" class="w-4 h-4 text-emerald-600 shrink-0"></i>
-                                        Prestation
                                     </span>
 
                                 </label>
@@ -319,7 +287,7 @@
 
                                 <div class="min-w-0">
                                     <label for="role" class="block text-xs font-semibold text-slate-600 mb-1.5">
-                                        Rôle <span class="font-normal text-slate-400">(facultatif pour un particulier)</span>
+                                        Rôle *
                                     </label>
 
                                     <input
@@ -328,6 +296,7 @@
                                         name="role"
                                         value="{{ old('role') }}"
                                         placeholder="Ex. : Employé, Prestataire"
+                                        required
                                         maxlength="255"
                                         class="w-full min-w-0 px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white text-sm"
                                     >
@@ -335,7 +304,7 @@
 
                                 <div class="min-w-0">
                                     <label for="entreprise" class="block text-xs font-semibold text-slate-600 mb-1.5">
-                                        Entreprise <span class="font-normal text-slate-400">(laisser vide pour un particulier)</span>
+                                        Entreprise
                                     </label>
 
                                     <input
@@ -665,49 +634,6 @@
 
                         </div>
 
-                        {{-- SECTION PRESTATION DE SERVICE --}}
-
-                        <div id="fields-prestation" class="space-y-4 pt-5 border-t border-gray-100" hidden>
-
-                            <h3 class="text-sm font-semibold text-slate-800">
-                                Détails de la prestation
-                            </h3>
-
-                            <div>
-                                <label for="description-prestation" class="block text-xs font-semibold text-slate-600 mb-1.5">
-                                    Prestation réalisée / produits fournis *
-                                </label>
-
-                                <textarea
-                                    id="description-prestation"
-                                    name="description"
-                                    rows="3"
-                                    required
-                                    maxlength="10000"
-                                    placeholder="Ex. : Fabrication et livraison de 5 portails métalliques"
-                                    class="w-full px-3.5 py-3 rounded-xl border border-gray-200 bg-white text-sm resize-y leading-relaxed"
-                                >{{ old('description') }}</textarea>
-                            </div>
-
-                            <div class="min-w-0">
-                                <label for="somme-prestation" class="block text-xs font-semibold text-slate-600 mb-1.5">
-                                    Somme reçue ce jour (FCFA) *
-                                </label>
-
-                                <input
-                                    type="number"
-                                    id="somme-prestation"
-                                    name="somme"
-                                    value="{{ old('somme') }}"
-                                    min="0"
-                                    step="any"
-                                    required
-                                    class="w-full min-w-0 px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white text-sm"
-                                >
-                            </div>
-
-                        </div>
-
                         {{-- SECTION RESPONSABILITÉ --}}
 
                         <div id="fields-responsabilite" class="space-y-4 pt-5 border-t border-gray-100" hidden>
@@ -726,116 +652,6 @@
                                     placeholder="Saisir les conditions précises..."
                                     class="w-full px-3.5 py-3 rounded-xl border border-gray-200 bg-white text-sm resize-y leading-relaxed"
                                 >{{ old('description') }}</textarea>
-                            </div>
-
-                        </div>
-
-                        {{-- SECTION ENGAGEMENT (facultative : matériel et prestation) --}}
-
-                        <div id="fields-engagement" class="space-y-4 pt-5 border-t border-gray-100" hidden>
-
-                            <label class="flex items-start gap-3 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    id="engagement_actif"
-                                    name="engagement_actif"
-                                    value="1"
-                                    class="mt-1 rounded border-gray-300"
-                                    {{ old('engagement_actif') ? 'checked' : '' }}
-                                >
-                                <span>
-                                    <span class="block text-sm font-semibold text-slate-800">
-                                        Ajouter un engagement (facultatif)
-                                    </span>
-                                    <span class="block text-xs text-slate-500">
-                                        Ex. : achat de matériel, fabrication avec paiement ou livraison en tranches.
-                                    </span>
-                                </span>
-                            </label>
-
-                            <div id="engagement-body" class="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4" hidden>
-
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-                                    <div class="min-w-0">
-                                        <label for="engagement_type" class="block text-xs font-semibold text-slate-600 mb-1.5">
-                                            Type d'engagement *
-                                        </label>
-
-                                        <select
-                                            id="engagement_type"
-                                            name="engagement_type"
-                                            required
-                                            class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white text-sm"
-                                        >
-                                            <option value="achat_materiel" {{ old('engagement_type') === 'achat_materiel' ? 'selected' : '' }}>Achat de matériel</option>
-                                            <option value="prestation" {{ old('engagement_type') === 'prestation' ? 'selected' : '' }}>Prestation / fabrication</option>
-                                        </select>
-                                    </div>
-
-                                    <div class="min-w-0">
-                                        <label for="engagement_montant" class="block text-xs font-semibold text-slate-600 mb-1.5">
-                                            Montant total convenu (FCFA)
-                                        </label>
-
-                                        <input
-                                            type="number"
-                                            id="engagement_montant"
-                                            name="engagement_montant"
-                                            value="{{ old('engagement_montant') }}"
-                                            min="0"
-                                            step="any"
-                                            class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white text-sm"
-                                        >
-                                    </div>
-
-                                </div>
-
-                                <div>
-                                    <label for="engagement_objet" class="block text-xs font-semibold text-slate-600 mb-1.5">
-                                        Objet de l'engagement *
-                                    </label>
-
-                                    <textarea
-                                        id="engagement_objet"
-                                        name="engagement_objet"
-                                        rows="3"
-                                        required
-                                        maxlength="2000"
-                                        placeholder="Ex. : Le soudeur s'engage à fabriquer et livrer 20 supports ; PLANETECH s'engage à les acheter."
-                                        class="w-full px-3.5 py-3 rounded-xl border border-gray-200 bg-white text-sm resize-y leading-relaxed"
-                                    >{{ old('engagement_objet') }}</textarea>
-                                </div>
-
-                                <div class="space-y-3">
-
-                                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-
-                                        <div>
-                                            <h4 class="text-sm font-bold text-slate-800">
-                                                Tranches (paiements / livraisons)
-                                            </h4>
-
-                                            <p class="text-xs text-slate-500 mt-1">
-                                                Laissez vide si tout est réglé / livré en une seule fois.
-                                            </p>
-                                        </div>
-
-                                        <button
-                                            type="button"
-                                            id="add-tranche-btn"
-                                            class="shrink-0 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-semibold rounded-lg transition-all"
-                                        >
-                                            <i data-lucide="plus" class="w-4 h-4"></i>
-                                            Ajouter une tranche
-                                        </button>
-
-                                    </div>
-
-                                    <div id="tranches-container" class="space-y-3"></div>
-
-                                </div>
-
                             </div>
 
                         </div>
@@ -906,12 +722,6 @@
                                         'icon'  => 'package',
                                         'bar'   => 'border-l-blue-400',
                                         'badge' => 'bg-blue-50 text-blue-700',
-                                    ],
-                                    'prestation' => [
-                                        'label' => 'Prestation',
-                                        'icon'  => 'hammer',
-                                        'bar'   => 'border-l-orange-400',
-                                        'badge' => 'bg-orange-50 text-orange-700',
                                     ],
                                     'responsabilite' => [
                                         'label' => 'Responsabilité',
@@ -1125,47 +935,22 @@ document.addEventListener('DOMContentLoaded', function () {
         lucide.createIcons();
     }
 
-    // 1. GESTION DES TYPES DE DÉCHARGE ET DE L'ENGAGEMENT
+    // 1. GESTION DES TYPES DE DÉCHARGE
 
     const form = document.getElementById('decharge-form');
     const typeInputs = document.querySelectorAll('input[name="type"]');
 
-    // Sections affichées selon le type choisi
-    const sectionsParType = {
-        argent: ['argent'],
-        materiel: ['materiel', 'engagement'],
-        prestation: ['prestation', 'engagement'],
-        responsabilite: ['responsabilite']
-    };
-
-    const engCheck = document.getElementById('engagement_actif');
-    const engBody = document.getElementById('engagement-body');
-
-    function toggleEngagement() {
-        const section = document.getElementById('fields-engagement');
-        const on = !section.hidden && engCheck.checked;
-
-        engBody.hidden = !on;
-
-        // Champs masqués = désactivés : ni validés, ni envoyés.
-        engBody.querySelectorAll('input, select, textarea').forEach(function (field) {
-            field.disabled = !on;
-        });
-    }
-
     function toggleTypeFields(selectedType) {
 
-        const actives = sectionsParType[selectedType] || [];
+        ['argent', 'materiel', 'responsabilite'].forEach(function (type) {
 
-        ['argent', 'materiel', 'prestation', 'responsabilite', 'engagement'].forEach(function (name) {
-
-            const section = document.getElementById('fields-' + name);
+            const section = document.getElementById('fields-' + type);
 
             if (!section) {
                 return;
             }
 
-            const active = actives.includes(name);
+            const active = type === selectedType;
 
             section.hidden = !active;
 
@@ -1176,95 +961,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
         });
 
-        toggleEngagement();
-
         if (window.lucide) {
             lucide.createIcons();
         }
     }
-
-    // 2. GESTION DES TRANCHES (engagement)
-
-    const tranchesContainer = document.getElementById('tranches-container');
-    let trancheIndex = 0;
-
-    function esc(value) {
-        return String(value ?? '')
-            .replace(/&/g, '&amp;')
-            .replace(/"/g, '&quot;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
-    }
-
-    function addTranche(data) {
-
-        data = data || {};
-
-        const i = trancheIndex++;
-        const row = document.createElement('div');
-
-        row.className = 'tranche-row grid grid-cols-1 sm:grid-cols-12 gap-2 items-end p-3 rounded-xl border border-slate-200 bg-white';
-
-        row.innerHTML = `
-            <div class="sm:col-span-3 min-w-0">
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Nature</label>
-                <select name="tranches[${i}][nature]" required class="w-full px-2.5 py-2 rounded-lg border border-gray-200 bg-white text-sm">
-                    <option value="paiement" ${data.nature === 'paiement' || !data.nature ? 'selected' : ''}>Paiement</option>
-                    <option value="livraison" ${data.nature === 'livraison' ? 'selected' : ''}>Livraison</option>
-                </select>
-            </div>
-
-            <div class="sm:col-span-3 min-w-0">
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Libellé</label>
-                <input type="text" name="tranches[${i}][libelle]" required maxlength="255"
-                       value="${esc(data.libelle)}" placeholder="Ex. : 1re tranche"
-                       class="w-full px-2.5 py-2 rounded-lg border border-gray-200 bg-white text-sm">
-            </div>
-
-            <div class="sm:col-span-3 min-w-0">
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Date prévue</label>
-                <input type="date" name="tranches[${i}][date_prevue]" value="${esc(data.date_prevue)}"
-                       class="w-full px-2.5 py-2 rounded-lg border border-gray-200 bg-white text-sm">
-            </div>
-
-            <div class="sm:col-span-2 min-w-0">
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Montant</label>
-                <input type="number" name="tranches[${i}][montant]" min="0" step="any"
-                       value="${esc(data.montant)}" placeholder="FCFA"
-                       class="w-full px-2.5 py-2 rounded-lg border border-gray-200 bg-white text-sm">
-            </div>
-
-            <div class="sm:col-span-1 flex justify-end">
-                <button type="button"
-                        class="remove-tranche inline-flex items-center justify-center p-2 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg transition-all"
-                        title="Supprimer la tranche" aria-label="Supprimer la tranche">✕</button>
-            </div>
-        `;
-
-        tranchesContainer.appendChild(row);
-    }
-
-    document.getElementById('add-tranche-btn').addEventListener('click', function () {
-        addTranche();
-    });
-
-    tranchesContainer.addEventListener('click', function (event) {
-        const button = event.target.closest('.remove-tranche');
-
-        if (button) {
-            button.closest('.tranche-row').remove();
-        }
-    });
-
-    // Restauration des tranches après une erreur de validation
-    const oldTranches = @json(array_values((array) old('tranches', [])));
-
-    oldTranches.forEach(function (t) {
-        addTranche(t);
-    });
-
-    // Initialisation de l'affichage
-    engCheck.addEventListener('change', toggleEngagement);
 
     const selectedTypeInput = document.querySelector('input[name="type"]:checked');
 
@@ -1276,7 +976,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // 3. GESTION DES LIGNES DE MATÉRIEL
+    // 2. GESTION DES LIGNES DE MATÉRIEL
 
     const addMaterielButton = document.getElementById('add-materiel-btn');
     const materielsContainer = document.getElementById('materiels-container');
@@ -1417,7 +1117,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // 4. CALCUL AUTOMATIQUE DU PRIX GLOBAL
+    // 3. CALCUL AUTOMATIQUE DU PRIX GLOBAL
 
     document.addEventListener('input', function (e) {
 
@@ -1438,7 +1138,7 @@ document.addEventListener('DOMContentLoaded', function () {
         row.querySelector('.prix-global').value = prixGlobal > 0 ? prixGlobal.toFixed(2) : '';
     });
 
-    // 5. ENVOI DU FORMULAIRE : empêcher les doubles soumissions
+    // 4. ENVOI DU FORMULAIRE : empêcher les doubles soumissions
 
     form.addEventListener('submit', function () {
 
