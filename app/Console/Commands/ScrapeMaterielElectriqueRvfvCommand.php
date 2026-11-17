@@ -28,13 +28,11 @@ class ScrapeMaterielElectriqueRvfvCommand extends Command
 
         $this->info("Début du scraping sur {$baseUrl} ...");
 
-        // 1. Récupération ou création sécurisée de la Catégorie Principale
         $electricite = Category::firstOrCreate(
             ['nom' => 'Électricité Générale'],
             ['created_at' => now(), 'updated_at' => now()]
         );
 
-        // 2. Gestion sécurisée des Sous-catégories associées
         $sousCategories = [
             'Matériel HT (Haute Tension) / MT (Moyenne Tension)',
             'Matériel BT (Basse Tension)',
@@ -162,9 +160,6 @@ class ScrapeMaterielElectriqueRvfvCommand extends Command
         return !preg_match('/\b(rvfv|edf|n1x6g3|fr-?n1x6g3|r2v|u-?1000\s*r2v|ro2v|h07v-[ur]|h07vu|h07vr|h05v-[ku]|h05vk|h05vv-?f|h07rn-?f|fil|câble|cable|conducteur|mm2|\d+\s*[gx]\s*\d+)/i', $lower);
     }
 
-    /**
-     * @return array{status: int, body: string, blocked: bool, failed: bool}
-     */
     private function fetchHtml(string $url): array
     {
         try {
