@@ -64,9 +64,10 @@
                         Actualiser
                     </a>
 
-                    {{-- Le PDF contient TOUS les résultats (pas seulement la page affichée) et respecte la recherche --}}
+                    {{-- Le PDF contient TOUS les résultats (pas seulement la page affichée),
+                         respecte la recherche et la date. Sans date : tous les enregistrements. --}}
                     <a
-                        href="{{ route('admin.entretiens.tous.pdf', ['recherche' => $recherche, 'download' => 1]) }}"
+                        href="{{ route('admin.entretiens.tous.pdf', ['recherche' => $recherche, 'date' => $date, 'download' => 1]) }}"
                         class="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100"
                     >
                         <i data-lucide="download" class="h-4 w-4"></i>
@@ -76,12 +77,14 @@
                     <button
                         id="btnImprimer"
                         type="button"
-                        data-print-url="{{ route('admin.entretiens.tous.pdf', ['recherche' => $recherche]) }}"
+                        data-print-url="{{ route('admin.entretiens.tous.pdf', ['recherche' => $recherche, 'date' => $date]) }}"
                         class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         <i data-lucide="printer" class="print-icon h-4 w-4"></i>
                         <span class="print-spinner hidden h-4 w-4 animate-spin rounded-full border-2 border-slate-600 border-t-transparent"></span>
-                        <span class="print-label">Imprimer</span>
+                        <span class="print-label">
+                            {{ $date ? 'Imprimer le ' . \Carbon\Carbon::parse($date)->format('d/m/Y') : 'Imprimer tout' }}
+                        </span>
                     </button>
 
                 </div>
@@ -132,14 +135,14 @@
 
             </div>
 
-            {{-- RECHERCHE --}}
+            {{-- RECHERCHE + FILTRE PAR DATE --}}
             <form
                 id="filtresEntretiens"
                 method="GET"
                 action="{{ url()->current() }}"
-                class="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm"
+                class="flex flex-col gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:flex-row sm:items-center"
             >
-                <div class="relative w-full xl:w-96">
+                <div class="relative w-full sm:w-96">
                     <i
                         data-lucide="search"
                         class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
@@ -155,6 +158,32 @@
                         class="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-4 text-xs outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
                     >
                 </div>
+
+                <div class="flex items-center gap-2">
+                    <label for="dateEntretiens" class="text-xs font-semibold text-slate-500">Date</label>
+                    <input
+                        id="dateEntretiens"
+                        name="date"
+                        type="date"
+                        value="{{ $date }}"
+                        max="{{ today()->format('Y-m-d') }}"
+                        class="rounded-xl border border-gray-200 px-3 py-2.5 text-xs outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                    >
+                </div>
+
+                @if($recherche || $date)
+                    <a
+                        href="{{ url()->current() }}"
+                        class="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2.5 text-xs font-semibold text-slate-600 transition hover:bg-gray-50"
+                    >
+                        <i data-lucide="x" class="h-4 w-4"></i>
+                        Réinitialiser
+                    </a>
+                @endif
+
+                @error('date')
+                    <p class="text-xs text-red-600">{{ $message }}</p>
+                @enderror
             </form>
 
             {{-- TABLEAU --}}
@@ -167,7 +196,10 @@
                             @if($entretiens->total() > 0)
                                 <span class="font-semibold text-slate-600">{{ $entretiens->total() }}</span>
                                 candidat{{ $entretiens->total() > 1 ? 's' : '' }}
-                                {{ $recherche ? 'trouvé' . ($entretiens->total() > 1 ? 's' : '') : 'au total' }}
+                                {{ ($recherche || $date) ? 'trouvé' . ($entretiens->total() > 1 ? 's' : '') : 'au total' }}
+                                @if($date)
+                                    le {{ \Carbon\Carbon::parse($date)->format('d/m/Y') }}
+                                @endif
                                 · affichage {{ $entretiens->firstItem() }} à {{ $entretiens->lastItem() }}
                             @else
                                 Aucun candidat pour le moment
@@ -275,13 +307,13 @@
                                         Les arrivées enregistrées apparaîtront ici.
                                     </p>
 
-                                    @if($recherche)
+                                    @if($recherche || $date)
                                         <a
                                             href="{{ url()->current() }}"
                                             class="mt-4 inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-800"
                                         >
                                             <i data-lucide="rotate-ccw" class="h-4 w-4"></i>
-                                            Réinitialiser la recherche
+                                            Réinitialiser les filtres
                                         </a>
                                     @endif
 
@@ -314,6 +346,7 @@
 <script>
     const formulaire = document.getElementById('filtresEntretiens');
     const champRecherche = document.getElementById('rechercheEntretiens');
+    const champDate = document.getElementById('dateEntretiens');
     let timerRecherche = null;
 
     // Recherche automatique après 500 ms sans frappe
@@ -324,6 +357,13 @@
         }, 500);
     });
 
+    // Filtre par date : application immédiate au changement
+    if (champDate) {
+        champDate.addEventListener('change', function () {
+            formulaire.submit();
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         if (window.lucide) {
             lucide.createIcons();
@@ -331,9 +371,12 @@
     });
 
     // Impression directe du PDF (iframe invisible)
+    // L'URL contient déjà la recherche et la date éventuelle.
     const btnImprimer = document.getElementById('btnImprimer');
 
     if (btnImprimer) {
+        const libelleInitial = btnImprimer.querySelector('.print-label').textContent.trim();
+
         btnImprimer.addEventListener('click', function () {
             const bouton = this;
             const base = bouton.dataset.printUrl;
@@ -347,7 +390,7 @@
                 bouton.disabled = false;
                 icone.classList.remove('hidden');
                 spinner.classList.add('hidden');
-                label.textContent = 'Imprimer';
+                label.textContent = libelleInitial;
             };
 
             bouton.disabled = true;

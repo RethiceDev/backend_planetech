@@ -24,7 +24,8 @@
     <p class="sous-titre">
         Édité le {{ now()->format('d/m/Y à H:i') }}
         · {{ $entretiens->count() }} candidat{{ $entretiens->count() > 1 ? 's' : '' }}
-        @if($recherche) · Recherche : « {{ $recherche }} » @endif
+        @if(!empty($date)) · Date : {{ \Carbon\Carbon::parse($date)->format('d/m/Y') }} @endif
+        @if(!empty($recherche)) · Recherche : « {{ $recherche }} » @endif
     </p>
 
     <table>

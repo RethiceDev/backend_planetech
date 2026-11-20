@@ -24,9 +24,9 @@ class EntretienController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'nom'     => ['required', 'string', 'max:100'],
-            'prenoms' => ['required', 'string', 'max:150'],
-            'poste'   => ['required', 'string', 'max:150'],
+            'nom'       => ['required', 'string', 'max:100'],
+            'prenoms'   => ['required', 'string', 'max:150'],
+            'poste'     => ['required', 'string', 'max:150'],
             'telephone' => ['required', 'string', 'max:30'],
         ], [
             'required' => 'Ce champ est obligatoire.',
@@ -72,22 +72,14 @@ class EntretienController extends Controller
     }
 
     /**
- * Page d'administration : historique complet des entretiens.
- */
+     * Page d'administration : historique complet des entretiens
+     * (recherche + filtre par date).
+     */
     public function tous(Request $request): View
     {
-        $recherche = trim((string) $request->query('recherche', ''));
+        [$recherche, $date] = $this->filtres($request);
 
-        $entretiens = Entretien::query()
-            ->when($recherche !== '', function ($query) use ($recherche) {
-                $query->where(function ($q) use ($recherche) {
-                    $q->where('nom', 'like', "%{$recherche}%")
-                    ->orWhere('prenoms', 'like', "%{$recherche}%")
-                    ->orWhere('telephone', 'like', "%{$recherche}%")
-                    ->orWhere('poste', 'like', "%{$recherche}%");
-                });
-            })
-            ->latest()
+        $entretiens = $this->requeteEntretiens($recherche, $date)
             ->paginate(20)
             ->withQueryString();
 
@@ -98,36 +90,65 @@ class EntretienController extends Controller
         return view('entretiens.tous', compact(
             'entretiens',
             'recherche',
+            'date',
             'totalEntretiens',
             'entretiensAujourdhui',
             'entretiensSemaine'
         ));
     }
 
+    /**
+     * PDF de TOUS les résultats (pas seulement la page affichée).
+     * Respecte la recherche et la date : sans date, tout est imprimé.
+     */
     public function tousPdf(Request $request)
     {
-        $recherche = trim((string) $request->query('recherche', ''));
+        [$recherche, $date] = $this->filtres($request);
 
-        $entretiens = Entretien::query()
-            ->when($recherche !== '', function ($query) use ($recherche) {
-                $query->where(function ($q) use ($recherche) {
-                    $q->where('nom', 'like', "%{$recherche}%")
-                    ->orWhere('prenoms', 'like', "%{$recherche}%")
-                    ->orWhere('telephone', 'like', "%{$recherche}%")
-                    ->orWhere('poste', 'like', "%{$recherche}%");
-                });
-            })
-            ->latest()
-            ->get();
+        $entretiens = $this->requeteEntretiens($recherche, $date)->get();
 
-        $pdf = Pdf::loadView('entretiens.pdf-tous', compact('entretiens', 'recherche'))
+        $pdf = Pdf::loadView('entretiens.pdf-tous', compact('entretiens', 'recherche', 'date'))
             ->setPaper('a4', 'portrait');
 
-        $nomFichier = 'entretiens-' . now()->format('Y-m-d') . '.pdf';
+        $nomFichier = 'entretiens-' . ($date ?: 'tous') . '.pdf';
 
         return $request->boolean('download')
             ? $pdf->download($nomFichier)
             : $pdf->stream($nomFichier);
     }
 
+    /**
+     * Lit et valide les filtres (recherche + date au format Y-m-d).
+     *
+     * @return array{0: string, 1: string|null}
+     */
+    private function filtres(Request $request): array
+    {
+        $request->validate([
+            'date' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+
+        $recherche = trim((string) $request->query('recherche', ''));
+        $date = $request->query('date') ?: null;
+
+        return [$recherche, $date];
+    }
+
+    /**
+     * Requête commune à la page et au PDF, pour qu'ils restent identiques.
+     */
+    private function requeteEntretiens(string $recherche, ?string $date)
+    {
+        return Entretien::query()
+            ->when($recherche !== '', function ($query) use ($recherche) {
+                $query->where(function ($q) use ($recherche) {
+                    $q->where('nom', 'like', "%{$recherche}%")
+                      ->orWhere('prenoms', 'like', "%{$recherche}%")
+                      ->orWhere('telephone', 'like', "%{$recherche}%")
+                      ->orWhere('poste', 'like', "%{$recherche}%");
+                });
+            })
+            ->when($date, fn ($query) => $query->whereDate('created_at', $date))
+            ->latest();
+    }
 }
