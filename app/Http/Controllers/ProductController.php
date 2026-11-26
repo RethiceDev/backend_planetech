@@ -31,8 +31,8 @@ class ProductController extends Controller
                       });
                 });
             })
-            ->orderBy('name', 'asc')
-            ->paginate(self::PER_PAGE)
+           ->orderBy('name', 'asc')
+            ->paginate(4)
             ->onEachSide(1)
             ->withQueryString();
 

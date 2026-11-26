@@ -289,11 +289,13 @@
                                 <div
                                     id="photo-preview"
                                     class="h-14 w-14 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center text-slate-400 shrink-0 overflow-hidden"
-                                >
+                                    >
                                     @if(isset($product) && $product->photo)
                                         <img
-                                            src="{{ $imgUrl($product->photo) }}"
-                                            alt="{{ $product->name }}"
+                                            src="{{ asset($productItem->photo) }}"
+                                            alt="{{ $productItem->name }}"
+                                            loading="lazy"
+                                            decoding="async"
                                             class="w-full h-full object-contain p-1"
                                         >
                                     @else
