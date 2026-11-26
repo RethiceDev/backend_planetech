@@ -36,13 +36,20 @@
 <body class="bg-gray-50 font-sans text-slate-800 antialiased">
 
 @php
-    // Gère les photos locales (storage) et les URL externes (scraping)
+    // Gère : URL externe, "storage/products/x.jpg" (scraping) et "products/x.jpg" (upload admin)
     $imgUrl = function ($path) {
         if (!$path) {
             return null;
         }
-        return \Illuminate\Support\Str::startsWith($path, ['http://', 'https://'])
-            ? $path
+
+        if (\Illuminate\Support\Str::startsWith($path, ['http://', 'https://'])) {
+            return $path;
+        }
+
+        $path = ltrim($path, '/');
+
+        return \Illuminate\Support\Str::startsWith($path, 'storage/')
+            ? asset($path)
             : asset('storage/' . $path);
     };
 @endphp
@@ -289,13 +296,11 @@
                                 <div
                                     id="photo-preview"
                                     class="h-14 w-14 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center text-slate-400 shrink-0 overflow-hidden"
-                                    >
+                                >
                                     @if(isset($product) && $product->photo)
                                         <img
-                                            src="{{ asset($productItem->photo) }}"
-                                            alt="{{ $productItem->name }}"
-                                            loading="lazy"
-                                            decoding="async"
+                                            src="{{ $imgUrl($product->photo) }}"
+                                            alt="{{ $product->name }}"
                                             class="w-full h-full object-contain p-1"
                                         >
                                     @else
