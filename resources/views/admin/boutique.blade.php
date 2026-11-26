@@ -503,7 +503,7 @@
                                             @csrf
                                             @method('DELETE')
 
-                                            <button 
+                                            <button disabled
                                                 type="submit"
                                                 class="p-2 rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600"
                                                 title="Supprimer"
