@@ -18,20 +18,28 @@ class ProductController extends Controller
     {
         $search = trim((string) $request->query('q', ''));
 
+        // Découpe en mots : chaque mot doit être trouvé quelque part
+        $words = array_filter(preg_split('/\s+/', $search));
+
         $products = Product::with('sousCategorie.category')
-            ->when($search !== '', function ($query) use ($search) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('price', 'like', "%{$search}%")
-                      ->orWhereHas('sousCategorie', function ($sq) use ($search) {
-                          $sq->where('nom', 'like', "%{$search}%")
-                             ->orWhereHas('category', function ($cq) use ($search) {
-                                 $cq->where('nom', 'like', "%{$search}%");
-                             });
-                      });
-                });
+            ->when(!empty($words), function ($query) use ($words) {
+                foreach ($words as $word) {
+                    $like = '%' . addcslashes($word, '%_\\') . '%';
+
+                    $query->where(function ($q) use ($like) {
+                        $q->where('name', 'like', $like)
+                          ->orWhere('description', 'like', $like)
+                          ->orWhere('price', 'like', $like)
+                          ->orWhereHas('sousCategorie', function ($sq) use ($like) {
+                              $sq->where('nom', 'like', $like)
+                                 ->orWhereHas('category', function ($cq) use ($like) {
+                                     $cq->where('nom', 'like', $like);
+                                 });
+                          });
+                    });
+                }
             })
-           ->orderBy('name', 'asc')
+            ->orderBy('name', 'asc')
             ->paginate(4)
             ->onEachSide(1)
             ->withQueryString();
@@ -79,14 +87,18 @@ class ProductController extends Controller
     }
 
     /**
-     * Supprime un fichier du disque public seulement si c'est un chemin local
-     * (et pas une URL externe issue du scraping).
+     * Supprime un fichier local (ignore les URL externes).
      */
     private function deleteLocalFile(?string $path): void
     {
-        if ($path && !preg_match('#^https?://#i', $path)) {
-            Storage::disk('public')->delete($path);
+        if (!$path || preg_match('#^https?://#i', $path)) {
+            return;
         }
+
+        // "storage/products/x.jpg" -> "products/x.jpg"
+        $path = preg_replace('#^/?storage/#', '', $path);
+
+        Storage::disk('public')->delete($path);
     }
 
     public function index(Request $request)

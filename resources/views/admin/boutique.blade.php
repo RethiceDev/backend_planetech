@@ -394,24 +394,37 @@
                     </div>
 
                     {{-- RECHERCHE (côté serveur, compatible pagination) --}}
-                    <form method="GET" action="{{ route('produits.index') }}" class="relative mb-4">
-                        <i data-lucide="search"
-                           class="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none"></i>
+                    <form id="searchForm" method="GET" action="{{ route('produits.index') }}" class="mb-4">
 
-                        <input
-                            id="searchInput"
-                            type="text"
-                            name="q"
-                            value="{{ $search ?? '' }}"
-                            placeholder="Rechercher un produit, prix ou catégorie"
-                            class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 text-xs outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-                        >
+                        <div class="flex items-center gap-2">
+                            <div class="relative flex-1">
+                                <i data-lucide="search"
+                                class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+
+                                <input
+                                    id="searchInput"
+                                    type="text"
+                                    name="q"
+                                    value="{{ $search ?? '' }}"
+                                    placeholder="Rechercher un produit, prix ou catégorie"
+                                    autocomplete="off"
+                                    class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 text-xs outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                                >
+                            </div>
+
+                            <button
+                                type="submit"
+                                class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium transition-colors"
+                            >
+                                Rechercher
+                            </button>
+                        </div>
 
                         @if(!empty($search))
-                            <a href="{{ route('produits.index') }}"
-                               class="text-[11px] text-slate-muted underline mt-1 inline-block">
-                                Effacer la recherche
-                            </a>
+                            <p class="text-[11px] text-slate-muted mt-2">
+                                {{ $products->total() }} résultat(s) pour « {{ $search }} » —
+                                <a href="{{ route('produits.index') }}" class="underline">Effacer la recherche</a>
+                            </p>
                         @endif
                     </form>
 
@@ -572,6 +585,28 @@
             }
         });
     }
+
+
+
+    // Recherche automatique après 0,6 s sans frappe
+const searchForm  = document.getElementById('searchForm');
+const searchInput = document.getElementById('searchInput');
+
+if (searchForm && searchInput) {
+    let searchTimer;
+
+    searchInput.addEventListener('input', function () {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => searchForm.submit(), 600);
+    });
+
+    // Après le rechargement, remet le curseur à la fin du texte
+    if (searchInput.value) {
+        searchInput.focus();
+        const end = searchInput.value.length;
+        searchInput.setSelectionRange(end, end);
+    }
+}
 </script>
 
 </body>
