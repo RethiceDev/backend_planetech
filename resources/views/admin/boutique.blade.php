@@ -491,7 +491,7 @@
                                             href="{{ route('produits.edit', ['product' => $productItem->id] + request()->only('q', 'page')) }}"
                                             class="p-2 rounded-lg text-slate-500 hover:bg-gray-100 hover:text-emerald-700"
                                             title="Modifier"
-                                        >
+                                            >
                                             <i data-lucide="pencil" class="w-4 h-4"></i>
                                         </a>
 
@@ -499,11 +499,11 @@
                                             action="{{ route('produits.destroy', $productItem->id) }}"
                                             method="POST"
                                             onsubmit="return confirm('Voulez-vous vraiment supprimer ce produit ?');"
-                                        >
+                                         >
                                             @csrf
                                             @method('DELETE')
 
-                                            <button
+                                            <button disabled
                                                 type="submit"
                                                 class="p-2 rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600"
                                                 title="Supprimer"
