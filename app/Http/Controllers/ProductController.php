@@ -1,125 +1,114 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use App\Models\Product;
-use App\Models\Category;
 use App\Models\SousCategorie;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class ProductController extends Controller
 {
-    /**
-     * Afficher la boutique et la liste des produits.
-     */
-    public function index()
-    {
-        $products = Product::with('sousCategorie.category')
-            ->orderBy('name', 'asc')
-            ->get();
+    private const PER_PAGE = 10;
 
-        $categories = Category::orderBy('nom', 'asc')
-            ->get();
+    /**
+     * Données communes à index() et edit() (liste paginée + recherche).
+     */
+    private function listData(Request $request): array
+    {
+        $search = trim((string) $request->query('q', ''));
+
+        $products = Product::with('sousCategorie.category')
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('price', 'like', "%{$search}%")
+                      ->orWhereHas('sousCategorie', function ($sq) use ($search) {
+                          $sq->where('nom', 'like', "%{$search}%")
+                             ->orWhereHas('category', function ($cq) use ($search) {
+                                 $cq->where('nom', 'like', "%{$search}%");
+                             });
+                      });
+                });
+            })
+            ->orderBy('name', 'asc')
+            ->paginate(self::PER_PAGE)
+            ->onEachSide(1)
+            ->withQueryString();
 
         $sousCategories = SousCategorie::with('category')
             ->orderBy('nom', 'asc')
             ->get();
 
-        return view('admin.boutique', compact(
-            'products',
-            'categories',
-            'sousCategories'
-        ));
+        return [
+            'products'       => $products,
+            'sousCategories' => $sousCategories,
+            'search'         => $search,
+        ];
+    }
+
+    private function rules(): array
+    {
+        return [
+            'name'              => ['required', 'string', 'max:255'],
+            'sous_categorie_id' => ['required', 'exists:sous_categories,id'],
+            'price'             => ['nullable', 'numeric', 'min:0'],
+            'description'       => ['required', 'string'],
+            'fiche_technique'   => ['nullable', 'file', 'mimes:pdf', 'max:5120'],
+            'photo'             => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+        ];
+    }
+
+    private function messages(): array
+    {
+        return [
+            'name.required'              => 'Le nom du produit est obligatoire.',
+            'name.max'                   => 'Le nom ne doit pas dépasser 255 caractères.',
+            'sous_categorie_id.required' => 'Veuillez sélectionner une sous-catégorie.',
+            'sous_categorie_id.exists'   => 'La sous-catégorie sélectionnée est invalide.',
+            'price.numeric'              => 'Le prix doit être un nombre valide.',
+            'price.min'                  => 'Le prix ne peut pas être négatif.',
+            'description.required'       => 'La description du produit est obligatoire.',
+            'fiche_technique.file'       => 'La fiche technique doit être un fichier valide.',
+            'fiche_technique.mimes'      => 'La fiche technique doit être un fichier PDF.',
+            'fiche_technique.max'        => 'La fiche technique ne doit pas dépasser 5 Mo.',
+            'photo.image'                => 'Le fichier sélectionné doit être une image.',
+            'photo.mimes'                => 'La photo doit être au format JPG, JPEG, PNG ou WEBP.',
+            'photo.max'                  => 'La photo ne doit pas dépasser 2 Mo.',
+        ];
     }
 
     /**
-     * Enregistrer un produit.
+     * Supprime un fichier du disque public seulement si c'est un chemin local
+     * (et pas une URL externe issue du scraping).
      */
+    private function deleteLocalFile(?string $path): void
+    {
+        if ($path && !preg_match('#^https?://#i', $path)) {
+            Storage::disk('public')->delete($path);
+        }
+    }
+
+    public function index(Request $request)
+    {
+        return view('admin.boutique', $this->listData($request));
+    }
+
     public function store(Request $request)
     {
-        $validated = $request->validate(
-            [
-                'name' => [
-                    'required',
-                    'string',
-                    'max:255',
-                ],
+        $validated = $request->validate($this->rules(), $this->messages());
 
-                'sous_categorie_id' => [
-                    'required',
-                    'exists:sous_categories,id',
-                ],
-
-                'price' => [
-                    'nullable',
-                    'numeric',
-                    'min:0',
-                ],
-
-                'description' => [
-                    
-                    'string',
-                ],
-
-                // Fiche technique facultative
-                'fiche_technique' => [
-                    'nullable',
-                    'string',
-                ],
-
-                'photo' => [
-                    'nullable',
-                    'image',
-                    'mimes:jpg,jpeg,png,webp',
-                    'max:2048',
-                ],
-            ],
-            [
-                'name.required' =>
-                    'Le nom du produit est obligatoire.',
-
-                'name.max' =>
-                    'Le nom ne doit pas dépasser 255 caractères.',
-
-                'sous_categorie_id.required' =>
-                    'Veuillez sélectionner une sous-catégorie.',
-
-                'sous_categorie_id.exists' =>
-                    'La sous-catégorie sélectionnée est invalide.',
-
-                'price.numeric' =>
-                    'Le prix doit être un nombre valide.',
-
-                'price.min' =>
-                    'Le prix ne peut pas être négatif.',
-
-                'description.required' =>
-                    'La description du produit est obligatoire.',
-
-                'fiche_technique.string' =>
-                    'La fiche technique doit être un texte valide.',
-
-                'photo.image' =>
-                    'Le fichier sélectionné doit être une image.',
-
-                'photo.mimes' =>
-                    'La photo doit être au format JPG, JPEG, PNG ou WEBP.',
-
-                'photo.max' =>
-                    'La photo ne doit pas dépasser 2 Mo.',
-            ]
-        );
-
-        // Gestion du stock
         $validated['stock'] = $request->boolean('stock');
 
-        // Upload de la photo
         if ($request->hasFile('photo')) {
-            $validated['photo'] = $request->file('photo')
-                ->store('products', 'public');
+            $validated['photo'] = $request->file('photo')->store('products', 'public');
         }
 
-        // Création du produit
+        if ($request->hasFile('fiche_technique')) {
+            $validated['fiche_technique'] = $request->file('fiche_technique')
+                ->store('fiches-techniques', 'public');
+        }
+
         Product::create($validated);
 
         return redirect()
@@ -127,127 +116,35 @@ class ProductController extends Controller
             ->with('success', 'Produit enregistré avec succès.');
     }
 
-    /**
-     * Afficher le formulaire de modification.
-     */
-    public function edit(Product $product)
+    public function edit(Request $request, Product $product)
     {
-        $products = Product::with('sousCategorie.category')
-            ->orderBy('name', 'asc')
-            ->get();
-
-        $categories = Category::orderBy('nom', 'asc')
-            ->get();
-
-        $sousCategories = SousCategorie::with('category')
-            ->orderBy('nom', 'asc')
-            ->get();
-
-        return view('admin.boutique', compact(
-            'product',
-            'products',
-            'categories',
-            'sousCategories'
+        return view('admin.boutique', array_merge(
+            $this->listData($request),
+            ['product' => $product]
         ));
     }
 
-    /**
-     * Modifier un produit.
-     */
     public function update(Request $request, Product $product)
     {
-        $validated = $request->validate(
-            [
-                'name' => [
-                    'required',
-                    'string',
-                    'max:255',
-                ],
+        $validated = $request->validate($this->rules(), $this->messages());
 
-                'sous_categorie_id' => [
-                    'required',
-                    'exists:sous_categories,id',
-                ],
-
-                'price' => [
-                    'nullable',
-                    'numeric',
-                    'min:0',
-                ],
-
-                'description' => [
-                    'required',
-                    'string',
-                ],
-
-                // Fiche technique facultative
-                'fiche_technique' => [
-                    'nullable',
-                    'string',
-                ],
-
-                'photo' => [
-                    'nullable',
-                    'image',
-                    'mimes:jpg,jpeg,png,webp',
-                    'max:2048',
-                ],
-            ],
-            [
-                'name.required' =>
-                    'Le nom du produit est obligatoire.',
-
-                'name.max' =>
-                    'Le nom ne doit pas dépasser 255 caractères.',
-
-                'sous_categorie_id.required' =>
-                    'Veuillez sélectionner une sous-catégorie.',
-
-                'sous_categorie_id.exists' =>
-                    'La sous-catégorie sélectionnée est invalide.',
-
-                'price.numeric' =>
-                    'Le prix doit être un nombre valide.',
-
-                'price.min' =>
-                    'Le prix ne peut pas être négatif.',
-
-                'description.required' =>
-                    'La description du produit est obligatoire.',
-
-                'fiche_technique.string' =>
-                    'La fiche technique doit être un texte valide.',
-
-                'photo.image' =>
-                    'Le fichier sélectionné doit être une image.',
-
-                'photo.mimes' =>
-                    'La photo doit être au format JPG, JPEG, PNG ou WEBP.',
-
-                'photo.max' =>
-                    'La photo ne doit pas dépasser 2 Mo.',
-            ]
-        );
-
-        // Gestion du stock
         $validated['stock'] = $request->boolean('stock');
 
-        // Si une nouvelle photo est envoyée
         if ($request->hasFile('photo')) {
-
-            // Supprimer l'ancienne photo
-            if ($product->photo) {
-                Storage::disk('public')->delete($product->photo);
-            }
-
-            // Enregistrer la nouvelle photo
-            $validated['photo'] = $request->file('photo')
-                ->store('products', 'public');
+            $this->deleteLocalFile($product->photo);
+            $validated['photo'] = $request->file('photo')->store('products', 'public');
+        } else {
+            unset($validated['photo']);
         }
 
-        // Mise à jour du produit
-        // La fiche technique existante est conservée si
-        // le champ n'est pas envoyé dans le formulaire.
+        if ($request->hasFile('fiche_technique')) {
+            $this->deleteLocalFile($product->fiche_technique);
+            $validated['fiche_technique'] = $request->file('fiche_technique')
+                ->store('fiches-techniques', 'public');
+        } else {
+            unset($validated['fiche_technique']);
+        }
+
         $product->update($validated);
 
         return redirect()
@@ -255,17 +152,11 @@ class ProductController extends Controller
             ->with('success', 'Produit modifié avec succès.');
     }
 
-    /**
-     * Supprimer un produit.
-     */
     public function destroy(Product $product)
     {
-        // Supprimer la photo du stockage
-        if ($product->photo) {
-            Storage::disk('public')->delete($product->photo);
-        }
+        $this->deleteLocalFile($product->photo);
+        $this->deleteLocalFile($product->fiche_technique);
 
-        // Supprimer le produit
         $product->delete();
 
         return redirect()

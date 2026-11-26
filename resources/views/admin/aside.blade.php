@@ -169,18 +169,16 @@
                 Espace contrôle
             </p>
 
-            <div
-                class="flex items-center gap-3 px-4 py-3 rounded-2xl font-medium text-sm
-                    text-emerald-100/40 cursor-not-allowed select-none"
-                aria-disabled="true"
-                title="Bientôt disponible"
-                >
+            <a
+                href=" {{ route('employees.index') }}"
+                class="flex items-center gap-3 px-4 py-3 rounded-2xl font-medium text-sm transition
+                    {{ request()->routeIs('admin.entretiens.jour')
+                        ? 'bg-white/10 text-white'
+                        : 'text-emerald-100/70 hover:bg-white/5 hover:text-white' }}"
+             >
                 <i data-lucide="users" class="w-5 h-5"></i>
-                <span>Employés</span>
-                <span class="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
-                    Bientôt
-                </span>
-            </div>
+                <span>Employées</span>
+            </a>
 
             <div
                 class="flex items-center gap-3 px-4 py-3 rounded-2xl font-medium text-sm

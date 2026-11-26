@@ -19,6 +19,14 @@ use App\Http\Controllers\Admin\ProcurationController;
 use App\Http\Controllers\LivraisonController;
 use App\Http\Controllers\EntretienController;
 use App\Http\Controllers\Admin\AttestationController;
+use App\Http\Controllers\EmployeeController;
+
+
+Route::get('/employees', [EmployeeController::class, 'index'])->name('employees.index');
+Route::post('/employees', [EmployeeController::class, 'store'])->name('employees.store');
+Route::get('/employees/{employee}/edit', [EmployeeController::class, 'edit'])->name('employees.edit');
+Route::put('/employees/{employee}', [EmployeeController::class, 'update'])->name('employees.update');
+Route::delete('/employees/{employee}', [EmployeeController::class, 'destroy'])->name('employees.destroy');
 
 // ... dans le groupe admin existant (prefix 'admin', name 'admin.', middleware auth)
 Route::get('attestations', [AttestationController::class, 'index'])->name('attestations.index');
